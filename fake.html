@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang = "en">
+<head>
+<title> Enter username</title>
+    <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <link rel="stylesheet" href="fake.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>ENTER USERNAME</h1>
+
+
+
+    <div class="login-box">
+        <input type="text" id="adminPass" placeholder="USERNAME" required>
+        <button id="adminLogin">CONTINUE</button>
+    </div>
+</div>
+
+<script>
+window.onload = function(){
+
+    // Initialize storage if missing
+    if(!localStorage.getItem('students')) localStorage.setItem('students', JSON.stringify([]));
+    if(!localStorage.getItem('teachers')) localStorage.setItem('teachers', JSON.stringify([]));
+    if(!localStorage.getItem('grades')) localStorage.setItem('grades', JSON.stringify({}));
+
+    document.getElementById('adminLogin').onclick = function(){
+        let pass = document.getElementById('adminPass').value.trim();
+       {
+            window.location.href = 'lol.html';
+        } 
+    }
+
+    document.getElementById('userLogin').onclick = function(){
+        let username = document.getElementById('username').value.trim();
+        let password = document.getElementById('password').value.trim();
+
+        const students = JSON.parse(localStorage.getItem('students')) || [];
+        const teachers = JSON.parse(localStorage.getItem('teachers')) || [];
+
+        const student = students.find(s => s.username === username && s.password === password);
+        const teacher = teachers.find(t => t.username === username && t.password === password);
+
+      
+      
+      
+    }
+}
+</script>
+</body>
+
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>System Alert</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            color: red;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        /* Stage 1: Virus Detected */
+        #virus-detected {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-size: 50px;
+            animation: blink 0.4s infinite alternate;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+
+        /* Stage 2: Broken TV Color Bars */
+        #broken-tv {
+            width: 100%;
+            height: 100vh;
+            display: none;
+            background: url('/mnt/data/c6161ab8-a468-4752-b8f0-beb6c9044651.jpg'); /* broken TV effect */
+            background-size: cover;
+            animation: shake 0.05s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(0, 0); }
+            25% { transform: translate(2px, -2px); }
+            50% { transform: translate(-2px, 2px); }
+            75% { transform: translate(2px, 2px); }
+            100% { transform: translate(-2px, -2px); }
+        }
+
+        /* Stage 3: Black Flash */
+        #black-screen {
+            width: 100%;
+            height: 100vh;
+            background: black;
+            display: none;
+        }
+
+        /* Final Virus Console */
+        #final-screen {
+            display: none;
+            padding-top: 50px;
+            color: red;
+        }
+
+        #warning {
+            font-size: 40px;
+            animation: blink 0.4s infinite alternate;
+        }
+
+        #console {
+            color: #0f0;
+            font-family: "Courier New";
+            margin-top: 30px;
+            font-size: 18px;
+            text-align: left;
+            width: 60%;
+            height: 300px;
+            border: 1px solid green;
+            padding: 15px;
+            overflow-y: auto;
+            margin-left: auto;
+            margin-right: auto;
+            background: rgba(0, 0, 0, 0.8);
+            box-shadow: 0 0 15px #0f0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="virus-detected">⚠ VIRUS DETECTED ⚠</div>
+<div id="broken-tv"></div>
+<div id="black-screen"></div>
+
+<div id="final-screen">
+    <h1 id="warning">⚠ SYSTEM FAILURE ⚠</h1>
+    <p>Attempting emergency system analysis…</p>
+    <div id="console"></div>
+</div>
+
+<script>
+    // 0–2s: Virus detected
+    // 2–4s: Broken TV effect
+    // 4–5s: Black screen flash
+    // 5s+: Final console
+
+    setTimeout(() => {
+        document.getElementById("virus-detected").style.display = "none";
+        document.getElementById("broken-tv").style.display = "block";
+    }, 2000);
+
+    setTimeout(() => {
+        document.getElementById("broken-tv").style.display = "none";
+        document.getElementById("black-screen").style.display = "block";
+    }, 4000);
+
+    setTimeout(() => {
+        document.getElementById("black-screen").style.display = "none";
+        document.getElementById("final-screen").style.display = "block";
+        startConsole();
+    }, 5000);
+
+    // More realistic console output
+    function startConsole() {
+        let consoleBox = document.getElementById("console");
+
+        let fakeLines = [
+            "[SYSTEM] Bootloader integrity check failed…",
+            "[ERROR] Kernel response timeout detected…",
+            "[WARNING] Malicious pattern found in memory sector 0x004A…",
+            "[SCAN] Attempting quarantine…",
+            "[FAILURE] Quarantine rejected: unauthorized overwrite…",
+            "[SYSTEM] GPU overheating — forced underclock…",
+            "[CRITICAL] CPU spike detected: 99% sustained…",
+            "[MEMORY] Phantom process detected (PID: ???)…",
+            "[ALERT] System mirror corrupted… Rebuilding…",
+            "[FAIL] Mirror sync interrupted by unknown source…",
+            "[TERMINAL] Security shell breached…",
+            "[CRITICAL ERROR] System stability at 1%…",
+            "[SHUTDOWN] Emergency shutdown attempt failed…",
+            "[SYSTEM] Entering failsafe mode…"
+        ];
+
+        let i = 0;
+        function typeLine() {
+            if (i < fakeLines.length) {
+                consoleBox.innerHTML += fakeLines[i] + "<br>";
+                i++;
+                setTimeout(typeLine, 500);
+            }
+        }
+
+        typeLine();
+    }
+</script>
+
+</body>
+</html>
