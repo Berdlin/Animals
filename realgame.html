@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feral Pursuit</title>
+    <style>
+        /* --- CORE VISUALS --- */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background-color: #080808; 
+            color: #ccc; 
+            margin: 0;
+            height: 100vh;
+            overflow: hidden; /* NO SCROLLING ON PAGE */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- LAYOUT --- */
+        .game-wrapper {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        /* MAP AREA (Full Screen Feel) */
+        .game-stage {
+            flex-grow: 1;
+            position: relative;
+            background-color: #0a0f0a;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #mapViewport {
+            width: 600px;
+            height: 600px;
+            background-color: #0c180f;
+            border: 2px solid #333;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* --- INVENTORY SIDEBAR (Toggleable) --- */
+        .inventory-sidebar {
+            width: 280px;
+            background-color: #111;
+            border-right: 2px solid #333; /* Border on the right edge */
+            height: 100vh;
+            position: absolute;
+            left: 0; /* Positioned on the left */
+            right: auto;
+            top: 0;
+            transform: translateX(-100%); /* Start hidden off the left */
+            transition: transform 0.3s ease-in-out;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5); /* Shadow on the right */
+        }
+
+        .inventory-sidebar.visible {
+            transform: translateX(0); /* Slide in to be visible */
+        }
+
+        .inv-header {
+            padding: 20px;
+            background-color: #1a1a1a;
+            text-align: center;
+            color: #ff4500;
+            font-family: 'Georgia', serif;
+            font-size: 1.2em;
+            border-bottom: 1px solid #333;
+        }
+
+        .inv-list {
+            flex-grow: 1;
+            overflow-y: auto; /* SCROLLABLE INVENTORY */
+            padding: 10px;
+        }
+        
+        /* Custom Scrollbar for Inventory */
+        .inv-list::-webkit-scrollbar { width: 8px; }
+        .inv-list::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        .inv-list::-webkit-scrollbar-track { background: #000; }
+
+        .inv-item {
+            background: #222;
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .inv-item:hover { background: #2a2a2a; border-color: #555; }
+        .inv-item.active { border-color: #ff4500; background: #2a1414; }
+
+        .key-hint {
+            background: #ff4500; color: #000; font-weight: bold;
+            width: 20px; height: 20px; border-radius: 3px;
+            display: flex; justify-content: center; align-items: center;
+            margin-right: 10px; font-size: 0.8em;
+        }
+
+        /* --- HUD ELEMENTS --- */
+        .hud-top {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 40px; z-index: 50;
+            background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 30px;
+            border: 1px solid #333; pointer-events: none;
+        }
+        .hud-stat { font-size: 1.2em; color: #fff; }
+        .hud-stat span { color: #ff4500; font-weight: bold; }
+        
+        /* Alpha Wolf HP Bar - NEW */
+        #wolfHPBar {
+            position: absolute; top: 5px; width: 100%; height: 5px; 
+            background: #444; overflow: hidden; display: none;
+        }
+        #wolfHPCurrent {
+            height: 100%; background: red; transition: width 0.2s;
+        }
+
+        /* --- GAME ENTITIES --- */
+        .icon { position: absolute; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; }
+        #playerIcon { font-size: 2em; width: 40px; height: 40px; background: #ff4500; border-radius: 50%; border: 2px solid #fff; z-index: 10; }
+        #wolfIcon { 
+            font-size: 2.5em; width: 50px; height: 50px; background: #500; border-radius: 50%; border: 2px solid #f00; z-index: 9; 
+            /* Include HP bar */
+            position: relative; /* important for inner HP bar */
+        }
+        
+        /* Friendly Wolf */
+        #friendlyWolfIcon {
+            font-size: 1.5em; width: 30px; height: 30px; 
+            background: #00bfff; border-radius: 50%; border: 2px solid #fff; 
+            z-index: 9; display: none; transition: width 0.3s, height 0.3s, background-color 0.1s;
+        }
+
+        .chest { font-size: 1.8em; z-index: 8; cursor: pointer; }
+        .chest-bad::after { content: ''; position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: red; border-radius: 50%; }
+
+        /* Story Overlay (New Position) */
+        #storyText {
+            position: absolute; top: 80px; left: 20px; /* Text on the left of the play bar */
+            width: 250px; /* Constrain width */
+            text-align: left; 
+            background: rgba(0,0,0,0.9);
+            padding: 10px; border-radius: 4px; color: #fff; 
+            border-left: 3px solid #00bfff; /* Highlight border */
+            z-index: 20;
+            pointer-events: none;
+            font-size: 0.9em;
+        }
+
+        /* --- Game Over --- */
+        #gameOverOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); display: none; 
+            justify-content: center; align-items: center; flex-direction: column; z-index: 200;
+        }
+        .restart-btn { margin-top: 20px; padding: 15px 30px; background: #ff4500; color: white; text-decoration: none; font-size: 1.2em; border-radius: 5px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        
+        <div id="inventoryPanel" class="inventory-sidebar">
+            <div class="inv-header">INVENTORY [Q/ALT]</div>
+            <div class="inv-list" id="invList">
+                </div>
+        </div>
+        
+        <div class="hud-top">
+            <div class="hud-stat">HP: <span id="hpDisplay">10</span></div>
+            <div class="hud-stat">TIME: <span id="timeDisplay">01:00</span></div>
+            <div class="hud-stat">DMG: <span id="dmgDisplay">1</span></div>
+        </div>
+
+        <div class="game-stage">
+            <div id="mapViewport">
+                <div id="playerIcon" class="icon">🏃</div>
+                <div id="wolfIcon" class="icon" style="left: -100px;">
+                    <div id="wolfHPBar"><div id="wolfHPCurrent" style="width: 100%;"></div></div>
+                    🐺
+                </div>
+                <div id="friendlyWolfIcon" class="icon">🐕</div>
+                
+                <div id="mapItems"></div>
+                <div id="effectsLayer"></div>
+            </div>
+            
+            <div id="storyText">
+                Press <strong>Q</strong> or <strong>Alt</strong> to toggle Inventory.<br>
+                Find the <strong>Potion</strong> to summon help!
+            </div>
+        </div>
+
+    </div>
+
+    <div id="gameOverOverlay">
+        <h1 id="endTitle" style="color:white; font-size:3em;">GAME OVER</h1>
+        <p id="endReason" style="color:#aaa; font-size:1.5em;"></p>
+        <a href="gameintro.html" class="restart-btn">Try Again</a>
+    </div>
+
+    <script>
+        // --- CONFIG & STATE ---
+        const PLAYER_SPEED = 6;
+        const WOLF_SPEED = 5;
+        const MAP_SIZE = 600;
+        const MAX_WOLF_HP = 50;
+        
+        let player = { x: 300, y: 300 };
+        let wolf = { x: -100, y: -100 }; // Offscreen initially
+        let companion = { x: 300, y: 300, active: false, level: 1 };
+        
+        let gameState = 'collection'; // collection, chase, battle, over
+        let timeLeft = 60;
+        let hp = 10;
+        let dmg = 1;
+        let wolfHp = MAX_WOLF_HP;
+        
+        let items = []; // Inventory array
+        let chests = [];
+        let keyStates = {};
+        
+        // ADAD Upgrade Logic
+        let adadBuffer = []; // Store last 4 keys
+
+        // --- INIT ---
+        function init() {
+            spawnChests();
+            renderInventory();
+            
+            // Loop & Timer
+            setInterval(gameLoop, 33);
+            setInterval(timerLoop, 1000);
+            
+            // Input Listeners
+            window.addEventListener('keydown', handleDown);
+            window.addEventListener('keyup', handleUp);
+        }
+
+        // --- CHESTS & ITEMS ---
+        function spawnChests() {
+            // Define positions
+            const pos = [
+                {x:100,y:100}, {x:300,y:100}, {x:500,y:100},
+                {x:100,y:300},                {x:500,y:300},
+                {x:100,y:500}, {x:300,y:500}, {x:500,y:500}
+            ];
+
+            // Loot Table
+            const loot = [
+                { name: "Summoning Potion", type: "potion", icon: "🧪", rare: true }, // GUARANTEED ONCE
+                { name: "Iron Sword (+2 DMG)", type: "dmg", val: 2, icon: "⚔️" },
+                { name: "Health Elixir (+20 HP)", type: "hp", val: 20, icon: "🍷" },
+                { name: "Rotten Flesh (-5 HP)", type: "bad", val: -5, icon: "🥩" },
+                { name: "Rusty Dagger (+1 DMG)", type: "dmg", val: 1, icon: "🗡️" },
+                { name: "Magic Shield (+50 HP)", type: "hp", val: 50, icon: "🛡️" },
+                { name: "Cursed Skull (-2 DMG)", type: "bad_dmg", val: -2, icon: "💀" },
+            ];
+
+            // Ensure potion exists in first chest for testing/gameplay flow
+            chests.push({ ...pos[0], opened: false, reward: loot.find(i => i.type === 'potion') || loot[0] });
+
+            for(let i=1; i<pos.length; i++) {
+                const randItem = loot[Math.floor(Math.random() * loot.length)];
+                chests.push({ ...pos[i], opened: false, reward: randItem });
+            }
+
+            drawChests();
+        }
+
+        function drawChests() {
+            const container = document.getElementById('mapItems');
+            container.innerHTML = '';
+            chests.forEach((c, i) => {
+                if(c.opened) return;
+                const el = document.createElement('div');
+                el.className = 'icon chest ' + (c.reward.type.includes('bad') ? 'chest-bad' : '');
+                el.innerText = '📦';
+                el.style.left = c.x + 'px';
+                el.style.top = c.y + 'px';
+                container.appendChild(el);
+            });
+        }
+
+        // --- GAME LOOP ---
+        function gameLoop() {
+            if(gameState === 'over') return;
+
+            // 1. Movement
+            let dx=0, dy=0;
+            if(keyStates['w']) dy--;
+            if(keyStates['s']) dy++;
+            if(keyStates['a']) dx--;
+            if(keyStates['d']) dx++;
+            
+            // Normalize
+            if(dx||dy) {
+                const len = Math.sqrt(dx*dx + dy*dy);
+                player.x += (dx/len)*PLAYER_SPEED;
+                player.y += (dy/len)*PLAYER_SPEED;
+            }
+            
+            // Clamp
+            player.x = Math.max(20, Math.min(MAP_SIZE-20, player.x));
+            player.y = Math.max(20, Math.min(MAP_SIZE-20, player.y));
+
+            updateIcon('playerIcon', player);
+
+            // 2. Interaction (E)
+            if(keyStates['e']) {
+                checkChests();
+                keyStates['e'] = false; // Trigger once
+            }
+
+            // 3. Companion Logic (Follows Player)
+            if(companion.active) {
+                const cEl = document.getElementById('friendlyWolfIcon');
+                cEl.style.display = 'flex';
+                
+                // Simple follow
+                companion.x += (player.x - companion.x) * 0.1;
+                companion.y += (player.y - companion.y) * 0.1;
+                updateIcon('friendlyWolfIcon', companion);
+            }
+
+            // 4. Enemy Wolf Logic
+            if(gameState === 'chase' || gameState === 'battle') {
+                document.getElementById('wolfHPBar').style.display = 'block';
+
+                const angle = Math.atan2(player.y - wolf.y, player.x - wolf.x);
+                wolf.x += Math.cos(angle) * WOLF_SPEED;
+                wolf.y += Math.sin(angle) * WOLF_SPEED;
+                updateIcon('wolfIcon', wolf);
+                
+                // Player Collision (Game Over)
+                const dist = Math.hypot(player.x - wolf.x, player.y - wolf.y);
+                if(dist < 40) {
+                    if(gameState === 'chase') endGame(false, "Caught by the Beast!");
+                    // If in battle, this would trigger damage to player
+                }
+                
+                // 4.1 Companion Attack Logic
+                if(companion.active) {
+                    const compDist = Math.hypot(companion.x - wolf.x, companion.y - wolf.y);
+                    // Base damage is companion.level * 2
+                    const companionDamage = companion.level * 2; 
+
+                    if(compDist < 50) { 
+                        // Check for cooldown
+                        if(!wolf.isAttackedCooldown || Date.now() > wolf.isAttackedCooldown) {
+                            wolfHp -= companionDamage;
+                            msg(`Companion Wolf (Lvl ${companion.level}) attacked the Alpha Wolf for ${companionDamage} damage!`);
+                            
+                            // Visual feedback for attack
+                            const el = document.getElementById('friendlyWolfIcon');
+                            el.style.backgroundColor = '#ff00ff'; // Flash magenta
+                            setTimeout(() => el.style.backgroundColor = '#00bfff', 100);
+
+                            // Set cooldown (Attack every 1 second)
+                            wolf.isAttackedCooldown = Date.now() + 1000; 
+                            
+                            // Check if Alpha Wolf is defeated
+                            if (wolfHp <= 0) {
+                                endGame(true, "The Companion Wolf defeated the Alpha! You survived the night.");
+                            }
+                        }
+                    }
+                }
+                updateWolfHPBar();
+            }
+
+            updateHUD();
+        }
+
+        function timerLoop() {
+            if(gameState !== 'collection') return;
+            timeLeft--;
+            if(timeLeft <= 0) {
+                gameState = 'chase';
+                wolf = { x: 50, y: 50, isAttackedCooldown: 0 }; // Initialize Wolf with cooldown
+                msg("THE ALPHA WOLF IS HERE! RUN!");
+            }
+        }
+
+        // --- ACTIONS ---
+        function checkChests() {
+            let found = false;
+            chests.forEach((c) => {
+                if(!c.opened && Math.hypot(player.x - c.x, player.y - c.y) < 50) {
+                    openChest(c);
+                    found = true;
+                }
+            });
+            if(!found) msg("No chest nearby. Press E to loot.");
+        }
+
+        function openChest(c) {
+            c.opened = true;
+            drawChests();
+            
+            // Apply Immediate Stats
+            if(c.reward.type === 'hp') hp += c.reward.val;
+            if(c.reward.type === 'dmg') dmg += c.reward.val;
+            if(c.reward.type === 'bad') hp += c.reward.val;
+            if(c.reward.type === 'bad_dmg') dmg += c.reward.val;
+
+            // Add to Inventory
+            items.push(c.reward);
+            renderInventory();
+            msg(`Found: ${c.reward.name}`);
+
+            if(hp <= 0) endGame(false, "You died from a cursed chest.");
+        }
+
+        function useItem(index) {
+            const item = items[index];
+            if(!item) {
+                 msg(`Slot ${index + 1} is empty.`);
+                 return;
+            }
+
+            if(item.type === 'potion') {
+                if(companion.active) {
+                    msg("The Summoning Potion is already used.");
+                    return;
+                }
+                summonCompanion();
+                msg("Companion Wolf Summoned! (Use ADAD to upgrade)");
+                // Remove the potion
+                items.splice(index, 1);
+                renderInventory();
+            } else {
+                msg(`Equipped/Used: ${item.name}`);
+            }
+        }
+
+        function summonCompanion() {
+            companion.active = true;
+            companion.level = 1;
+            // Spawn near player
+            companion.x = player.x + 30;
+            companion.y = player.y;
+        }
+
+        function handleUpgradeCode(key) {
+            if(!companion.active) return;
+            
+            // Only track A and D
+            const k = key.toLowerCase();
+            if(k === 'a' || k === 'd') {
+                adadBuffer.push(k);
+                if(adadBuffer.length > 4) adadBuffer.shift(); // Keep last 4
+
+                // Check Pattern 'a','d','a','d'
+                if(adadBuffer.join('') === 'adad') {
+                    upgradeCompanion();
+                    adadBuffer = []; // Reset
+                }
+            }
+        }
+
+        function upgradeCompanion() {
+            companion.level++;
+            msg(`Companion Upgraded! Level ${companion.level}. Damage increased!`);
+            // Visual Effect
+            const el = document.getElementById('friendlyWolfIcon');
+            const newSize = 30 + (companion.level * 5);
+            el.style.width = newSize + 'px';
+            el.style.height = newSize + 'px';
+            el.style.backgroundColor = '#00ffff'; // Brighter blue
+            setTimeout(() => el.style.backgroundColor = '#00bfff', 200);
+        }
+
+        // --- UI ---
+        function renderInventory() {
+            const list = document.getElementById('invList');
+            list.innerHTML = '';
+            items.forEach((item, i) => {
+                const row = document.createElement('div');
+                row.className = 'inv-item';
+                // Click to use
+                row.onclick = () => useItem(i);
+                
+                // Inventory Number Hint (i+1)
+                row.innerHTML = `
+                    <div class="key-hint">${i+1}</div>
+                    <span>${item.icon} ${item.name}</span>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function toggleInventory() {
+            const p = document.getElementById('inventoryPanel');
+            // Toggle the 'visible' class
+            p.classList.toggle('visible'); 
+        }
+
+        function updateHUD() {
+            document.getElementById('hpDisplay').innerText = hp;
+            document.getElementById('dmgDisplay').innerText = dmg;
+            document.getElementById('timeDisplay').innerText = formatTime(timeLeft);
+        }
+
+        function updateWolfHPBar() {
+            const percentage = Math.max(0, (wolfHp / MAX_WOLF_HP) * 100);
+            document.getElementById('wolfHPCurrent').style.width = percentage + '%';
+        }
+
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function updateIcon(id, obj) {
+            const el = document.getElementById(id);
+            el.style.left = obj.x + 'px';
+            el.style.top = obj.y + 'px';
+        }
+
+        function msg(text) {
+            document.getElementById('storyText').innerText = text;
+        }
+
+        function endGame(win, reason) {
+            gameState = 'over';
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+            document.getElementById('endTitle').innerText = win ? "VICTORY" : "GAME OVER";
+            document.getElementById('endReason').innerText = reason;
+        }
+
+        // --- INPUT HANDLERS ---
+        function handleDown(e) {
+            const k = e.key.toLowerCase();
+            
+            // Map arrow keys to WASD
+            let mappedKey = k;
+            if (k === 'arrowup') mappedKey = 'w';
+            if (k === 'arrowdown') mappedKey = 's';
+            if (k === 'arrowleft') mappedKey = 'a';
+            if (k === 'arrowright') mappedKey = 'd';
+
+            const isMoveKey = ['w','a','s','d'].includes(mappedKey);
+            
+            if(isMoveKey) {
+                keyStates[mappedKey] = true;
+                handleUpgradeCode(k); // Check for ADAD using the original key
+            }
+            if(k === 'e') keyStates['e'] = true;
+            
+            // Inventory Toggle
+            if(k === 'q' || k === 'alt') {
+                e.preventDefault();
+                toggleInventory();
+            }
+
+            // Inventory Use (1-9)
+            if(k >= '1' && k <= '9') {
+                // Ensure key is treated as number index (1 -> index 0)
+                useItem(parseInt(k)-1);
+            }
+        }
+
+        function handleUp(e) {
+            const k = e.key.toLowerCase();
+            // Map arrow keys to WASD for keyUp
+            let mappedKey = k;
+            if (k === 'arrowup') mappedKey = 'w';
+            if (k === 'arrowdown') mappedKey = 's';
+            if (k === 'arrowleft') mappedKey = 'a';
+            if (k === 'arrowright') mappedKey = 'd';
+
+            if(['w','a','s','d'].includes(mappedKey)) keyStates[mappedKey] = false;
+        }
+
+        init();
+    </script>
+</body>
+</html>
