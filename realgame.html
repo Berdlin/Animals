@@ -27,24 +27,35 @@
             position: relative;
         }
 
+        /* The Stage is the "Window" we look through */
         .game-stage {
             flex-grow: 1;
             position: relative;
-            background-color: #0a0f0a;
+            background-color: #050805;
             overflow: hidden;
+            /* Clips the large map */
             display: flex;
             justify-content: center;
             align-items: center;
         }
 
+        /* The Viewport is now the actual large world */
         #mapViewport {
-            width: 600px;
-            height: 600px;
+            width: 1500px;
+            /* Increased World Size */
+            height: 1500px;
+            /* Increased World Size */
             background-color: #0c180f;
-            border: 2px solid #333;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 100px 100px;
+            border: 5px solid #222;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: transform 0.05s linear;
+            /* Smooths camera jitter */
         }
 
         /* Inventory Panel */
@@ -115,7 +126,7 @@
             transform: translateX(-50%);
             display: flex;
             gap: 15px;
-            z-index: 50;
+            z-index: 150;
             background: rgba(0, 0, 0, 0.8);
             padding: 10px 20px;
             border-radius: 30px;
@@ -386,20 +397,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 100;
-            display: none;
-        }
-
-        @media (max-width: 900px) {
-            .mobile-controls-layer {
-                display: block;
-            }
-
-            #mapViewport {
-                width: 100%;
-                height: 100%;
-                border: none;
-            }
+            z-index: 110;
         }
 
         #joystickZone {
@@ -508,27 +506,19 @@
 
         <div id="adminPanel">
             <h2>ADMIN CONSOLE</h2>
-            <div class="admin-row">
-                <label>Set Day:</label>
-                <input type="number" id="admDay" class="admin-input" value="1">
-            </div>
-            <div class="admin-row">
-                <label>Set HP:</label>
-                <input type="number" id="admHp" class="admin-input" value="100">
-            </div>
-            <div class="admin-row">
-                <label>Set DMG:</label>
-                <input type="number" id="admDmg" class="admin-input" value="10">
-            </div>
-            <div class="admin-row">
-                <label>Player Speed:</label>
-                <input type="number" id="admSpeed" class="admin-input" value="6">
-            </div>
+            <div class="admin-row"><label>Set Day:</label><input type="number" id="admDay" class="admin-input"
+                    value="1"></div>
+            <div class="admin-row"><label>Set HP:</label><input type="number" id="admHp" class="admin-input"
+                    value="100"></div>
+            <div class="admin-row"><label>Set DMG:</label><input type="number" id="admDmg" class="admin-input"
+                    value="10"></div>
+            <div class="admin-row"><label>Player Speed:</label><input type="number" id="admSpeed" class="admin-input"
+                    value="6"></div>
             <button class="admin-btn" onclick="applyAdminSettings()">APPLY CHANGES</button>
             <button class="admin-btn" onclick="closeAdmin()">CLOSE</button>
         </div>
 
-        <div class="game-stage">
+        <div class="game-stage" id="stage">
             <div id="mapViewport">
                 <div id="playerIcon" class="icon">🏃</div>
                 <div id="wolvesContainer"></div>
@@ -545,7 +535,7 @@
                 <p style="text-align:center; font-size:0.8em; color:#888;">Press 'O' or 🐕 to close</p>
             </div>
 
-            <div class="mobile-controls-layer">
+            <div class="mobile-controls-layer" id="mobileLayer">
                 <div id="joystickZone">
                     <div id="joystickKnob"></div>
                 </div>
@@ -563,29 +553,26 @@
 
     <div id="gameOverOverlay">
         <h1 id="endTitle" style="color:white; font-size:3em;">GAME OVER</h1>
-
         <h2 id="daysSurvivedText" style="color: #ffaa00; font-family: 'Courier New', monospace; margin: 0;"></h2>
-
         <p id="endReason" style="color:#aaa; font-size:1.5em; margin-bottom: 30px;"></p>
-
         <div id="lossButtons" style="display: none;">
             <button onclick="resetGame()" class="overlay-btn">Restart (Day 1)</button>
             <button onclick="exitGame()" class="overlay-btn" style="background:#555;">Main Menu</button>
         </div>
-
         <div id="winButtons" style="display: none;">
             <button onclick="nextLevel()" class="overlay-btn" style="background:#4CAF50">Next Day</button>
         </div>
     </div>
 
     <script>
-        let PLAYER_SPEED = 6;
-        const WOLF_SPEED = 4.0;
-        const DOG_SPEED = 5.5;
-        const MAP_SIZE = 600;
+        let PLAYER_SPEED = 7;
+        const WOLF_SPEED = 4.5;
+        const DOG_SPEED = 6.0;
+        const MAP_SIZE = 1500; // Increased Map Size
 
-        let currentLevel = 1; // Actually Day
-        let player = { x: 300, y: 300, invulnerable: false };
+        let currentLevel = 1;
+        let player = { x: 750, y: 750, invulnerable: false };
+        let camera = { x: 0, y: 0 };
         let wolves = [];
         let companions = [];
         let gameState = 'collection';
@@ -607,8 +594,9 @@
             window.addEventListener('keyup', handleUp);
             initJoystick();
 
+            // Mobile detection
             if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                document.querySelector('.mobile-controls-layer').style.display = 'block';
+                document.getElementById('mobileLayer').style.display = 'block';
             }
         }
 
@@ -630,10 +618,8 @@
         }
 
         function resetGame() {
-            currentLevel = 1;
-            hp = 100; maxHp = 100; dmg = 10;
-            companions = [];
-            items = [];
+            currentLevel = 1; hp = 100; maxHp = 100; dmg = 10;
+            companions = []; items = [];
             startLevel(1);
         }
 
@@ -642,15 +628,12 @@
         function startLevel(lvl) {
             currentLevel = lvl;
             gameState = 'collection';
-            timeLeft = 20;
-            player.x = 300; player.y = 300;
+            timeLeft = 25;
+            player.x = 750; player.y = 750;
 
             companions.forEach(dog => {
-                dog.level++;
-                dog.maxHp += 20;
-                dog.hp = Math.min(dog.maxHp, dog.hp + 50);
-                dog.dmg += 5;
-                dog.x = player.x; dog.y = player.y;
+                dog.level++; dog.maxHp += 20; dog.hp = Math.min(dog.maxHp, dog.hp + 50);
+                dog.dmg += 5; dog.x = player.x; dog.y = player.y;
             });
 
             document.getElementById('gameOverOverlay').style.display = 'none';
@@ -664,11 +647,10 @@
             updateHUD();
 
             if (lvl === 1) {
-                showAlert("DAY 1: CURSED LOOT DETECTED", "red");
-                msg("Day 1: Only 1 Wolf, but 60% of Loot is BAD!");
+                showAlert("DAY 1: THE HIKING GROUNDS", "white");
+                msg("Find items. Avoid the wolf soon.");
             } else {
-                showAlert(`DAY ${lvl}: THE PACK GROWS`, "#00bfff");
-                msg(`Day ${lvl}: Better Loot, More Wolves.`);
+                showAlert(`DAY ${lvl}: THE PACK EXPANDS`, "#00bfff");
             }
         }
 
@@ -676,14 +658,15 @@
             wolves = [];
             const container = document.getElementById('wolvesContainer');
             container.innerHTML = '';
-            let count = (level === 1) ? 1 : Math.min(level + 1, 25);
+            let count = (level === 1) ? 1 : Math.min(level + 1, 30);
             const wolfHP = level * 80 + 50;
             const wolfDMG = level * 5 + 5;
 
             for (let i = 0; i < count; i++) {
-                let wx = Math.random() > 0.5 ? -50 : MAP_SIZE + 50;
+                // Spawn wolves outside the map view
+                let wx = Math.random() > 0.5 ? -100 : MAP_SIZE + 100;
                 let wy = Math.random() * MAP_SIZE;
-                wolves.push({ id: i, x: wx, y: wy, hp: wolfHP, maxHp: wolfHP, dmg: wolfDMG, targetedBy: null });
+                wolves.push({ id: i, x: wx, y: wy, hp: wolfHP, maxHp: wolfHP, dmg: wolfDMG });
                 const el = document.createElement('div');
                 el.className = 'wolf-entity'; el.id = `wolf-${i}`; el.style.display = 'none';
                 el.innerHTML = `<div class="bar-container"><div class="bar-fill" id="wolf-hp-${i}" style="width: 100%; background:red;"></div></div>🐺`;
@@ -693,10 +676,10 @@
 
         function spawnChests(level) {
             chests = [];
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 12; i++) {
                 chests.push({
-                    x: Math.random() * (MAP_SIZE - 40) + 20,
-                    y: Math.random() * (MAP_SIZE - 40) + 20,
+                    x: Math.random() * (MAP_SIZE - 100) + 50,
+                    y: Math.random() * (MAP_SIZE - 100) + 50,
                     opened: false,
                     reward: generateReward(level)
                 });
@@ -706,24 +689,17 @@
 
         function generateReward(level) {
             const rand = Math.random() * 100;
-            let badChance = (level === 1) ? 60 : 25;
-
+            let badChance = (level === 1) ? 50 : 20;
             if (rand < badChance) {
-                const badPool = [
-                    { name: "Cursed Blade", type: "curse_dmg", val: -5, icon: "💀", desc: "-5 DMG" },
-                    { name: "Blood Debt", type: "hp_half", val: 0.5, icon: "🩸", desc: "Halves HP" },
-                    { name: "Rotten Flesh", type: "hp_loss", val: -20, icon: "🥩", desc: "-20 HP" },
-                ];
-                return badPool[Math.floor(Math.random() * badPool.length)];
+                return [{ name: "Cursed Blade", type: "curse_dmg", val: -5, icon: "💀" },
+                { name: "Blood Debt", type: "hp_half", val: 0.5, icon: "🩸" },
+                { name: "Rotten Meat", type: "hp_loss", val: -25, icon: "🥩" }][Math.floor(Math.random() * 3)];
             } else if (rand < badChance + 15) {
-                return { name: "Summoning Potion", type: "potion", icon: "🐕", desc: "Summons Dog" };
+                return { name: "Summon Dog", type: "potion", icon: "🐕" };
             } else {
-                const pool = [
-                    { name: "Iron Sword", type: "sword", val: 10, icon: "⚔️", desc: "+10 DMG" },
-                    { name: "Health Elixir", type: "hp", val: 30, icon: "🍷", desc: "+30 HP" },
-                    { name: "Magic Shield", type: "shield", val: 50, icon: "🛡️", desc: "+50 MaxHP" }
-                ];
-                return pool[Math.floor(Math.random() * pool.length)];
+                return [{ name: "Steel Sword", type: "sword", val: 12, icon: "⚔️" },
+                { name: "Health Kit", type: "hp", val: 40, icon: "🍷" },
+                { name: "Plate Armor", type: "shield", val: 60, icon: "🛡️" }][Math.floor(Math.random() * 3)];
             }
         }
 
@@ -734,10 +710,28 @@
                 if (c.opened) return;
                 const el = document.createElement('div');
                 el.className = 'icon chest'; el.innerText = '📦';
-                el.id = `chest-${i}`;
-                el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
+                el.id = `chest-${i}`; el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
                 container.appendChild(el);
             });
+        }
+
+        function updateCamera() {
+            const stage = document.getElementById('stage');
+            const viewport = document.getElementById('mapViewport');
+
+            // Screen center
+            const centerX = stage.clientWidth / 2;
+            const centerY = stage.clientHeight / 2;
+
+            // Camera target (centering player)
+            camera.x = centerX - player.x;
+            camera.y = centerY - player.y;
+
+            // Constrain camera so it doesn't show "void" outside map
+            camera.x = Math.min(0, Math.max(camera.x, stage.clientWidth - MAP_SIZE));
+            camera.y = Math.min(0, Math.max(camera.y, stage.clientHeight - MAP_SIZE));
+
+            viewport.style.transform = `translate(${camera.x}px, ${camera.y}px)`;
         }
 
         function gameLoop() {
@@ -749,16 +743,16 @@
 
             if (dx || dy) {
                 const len = Math.sqrt(dx * dx + dy * dy);
-                if (len > 0) {
-                    const speedMod = joyActive ? len : 1;
-                    player.x += (dx / len) * PLAYER_SPEED * speedMod;
-                    player.y += (dy / len) * PLAYER_SPEED * speedMod;
-                }
+                const speedMod = joyActive ? len : 1;
+                player.x += (dx / len) * PLAYER_SPEED * speedMod;
+                player.y += (dy / len) * PLAYER_SPEED * speedMod;
             }
 
             player.x = Math.max(20, Math.min(MAP_SIZE - 20, player.x));
             player.y = Math.max(20, Math.min(MAP_SIZE - 20, player.y));
+
             updateIcon('playerIcon', player);
+            updateCamera(); // Move screen with player
 
             handleCompanionAI();
 
@@ -774,7 +768,7 @@
 
                     if (Math.hypot(player.x - wolf.x, player.y - wolf.y) < 35 && !player.invulnerable) {
                         hp -= wolf.dmg; triggerHit(wolf.dmg);
-                        if (hp <= 0) triggerGameOver(false, "The Pack Overwhelmed You");
+                        if (hp <= 0) triggerGameOver(false, "The pack was too fast.");
                     }
                 });
             }
@@ -783,59 +777,26 @@
 
         function handleCompanionAI() {
             const livingWolves = wolves.filter(w => w.hp > 0);
-            const assignedTargets = new Set();
+            companions.forEach((dog, i) => {
+                if (dog.hp <= 0) return;
 
-            for (let i = companions.length - 1; i >= 0; i--) {
-                const dog = companions[i];
-                if (dog.hp <= 0) {
-                    const el = document.getElementById(`comp-${i}`);
-                    if (el) el.remove();
-                    companions.splice(i, 1);
-                    showAlert("A COMPANION HAS DIED!", "red");
-                    setTimeout(renderCompanions, 100);
-                    continue;
-                }
-
-                let target = null;
-                if (gameState === 'chase' && livingWolves.length > 0) {
-                    let bestWolf = null; let minDist = 9999;
-                    for (let w of livingWolves) {
-                        if (!assignedTargets.has(w.id)) {
-                            const d = Math.hypot(w.x - dog.x, w.y - dog.y);
-                            if (d < minDist) { minDist = d; bestWolf = w; }
-                        }
-                    }
-                    if (bestWolf) { target = bestWolf; assignedTargets.add(bestWolf.id); }
-                    else {
-                        minDist = 9999;
-                        for (let w of livingWolves) {
-                            const d = Math.hypot(w.x - dog.x, w.y - dog.y);
-                            if (d < minDist) { minDist = d; target = w; }
-                        }
-                    }
-                } else { target = player; }
-
+                let target = (gameState === 'chase' && livingWolves.length > 0) ? livingWolves[i % livingWolves.length] : player;
                 const angle = Math.atan2(target.y - dog.y, target.x - dog.x);
                 const dist = Math.hypot(target.x - dog.x, target.y - dog.y);
 
                 if (target === player) {
-                    if (dist > 40) { dog.x += Math.cos(angle) * (DOG_SPEED + 1); dog.y += Math.sin(angle) * (DOG_SPEED + 1); }
+                    if (dist > 60) { dog.x += Math.cos(angle) * (DOG_SPEED + 1); dog.y += Math.sin(angle) * (DOG_SPEED + 1); }
                 } else {
-                    if (dist > 25) { dog.x += Math.cos(angle) * DOG_SPEED; dog.y += Math.sin(angle) * DOG_SPEED; }
-                    if (dist < 45) {
-                        if (Date.now() > (dog.cooldown || 0)) {
-                            target.hp -= dog.dmg;
-                            dog.cooldown = Date.now() + 800;
-                            dog.hp -= (target.dmg / 2);
-                            updateDogHP(i, dog);
-                            const wBar = document.getElementById(`wolf-hp-${target.id}`);
-                            if (wBar) wBar.style.width = (target.hp / target.maxHp * 100) + '%';
-                            if (target.hp <= 0) checkVictory();
-                        }
+                    if (dist > 30) { dog.x += Math.cos(angle) * DOG_SPEED; dog.y += Math.sin(angle) * DOG_SPEED; }
+                    if (dist < 50 && Date.now() > (dog.cooldown || 0)) {
+                        target.hp -= dog.dmg; dog.cooldown = Date.now() + 800;
+                        const wBar = document.getElementById(`wolf-hp-${target.id}`);
+                        if (wBar) wBar.style.width = (target.hp / target.maxHp * 100) + '%';
+                        if (target.hp <= 0) checkVictory();
                     }
                 }
                 updateIcon(`comp-${i}`, dog);
-            }
+            });
         }
 
         function renderCompanions() {
@@ -844,14 +805,9 @@
             companions.forEach((c, i) => {
                 const el = document.createElement('div');
                 el.className = 'friendly-wolf'; el.id = `comp-${i}`;
-                el.innerHTML = `<div class="bar-container"><div class="bar-fill" id="dog-hp-${i}" style="width:${(c.hp / c.maxHp) * 100}%; background:#00ff00;"></div></div>🐕`;
+                el.innerHTML = `<div class="bar-container"><div class="bar-fill" id="dog-hp-${i}" style="width:100%; background:#00ff00;"></div></div>🐕`;
                 container.appendChild(el);
             });
-        }
-
-        function updateDogHP(index, dog) {
-            const bar = document.getElementById(`dog-hp-${index}`);
-            if (bar) bar.style.width = Math.max(0, (dog.hp / dog.maxHp) * 100) + '%';
         }
 
         function playerAttack() {
@@ -862,7 +818,7 @@
             setTimeout(() => ripple.remove(), 300);
 
             wolves.forEach(w => {
-                if (w.hp > 0 && Math.hypot(w.x - player.x, w.y - player.y) < 80) {
+                if (w.hp > 0 && Math.hypot(w.x - player.x, w.y - player.y) < 100) {
                     w.hp -= dmg;
                     const wBar = document.getElementById(`wolf-hp-${w.id}`);
                     if (wBar) wBar.style.width = (w.hp / w.maxHp * 100) + '%';
@@ -871,38 +827,33 @@
             });
         }
 
-        function checkVictory() { if (wolves.every(w => w.hp <= 0)) triggerGameOver(true, "Area Cleared!"); }
+        function checkVictory() { if (wolves.every(w => w.hp <= 0)) triggerGameOver(true, "Wave Defeated"); }
 
         function triggerHit(val) {
             player.invulnerable = true;
             document.getElementById('playerIcon').classList.add('invulnerable');
-            showAlert(`TOOK ${val} DAMAGE!`, "red");
             setTimeout(() => { player.invulnerable = false; document.getElementById('playerIcon').classList.remove('invulnerable'); }, 1000);
         }
 
         function showAlert(text, color) {
             const el = document.getElementById('topAlertBox');
             el.innerText = text; el.style.borderColor = color; el.style.color = color; el.style.opacity = 1;
-            if (el.timeout) clearTimeout(el.timeout); el.timeout = setTimeout(() => el.style.opacity = 0, 2500);
+            setTimeout(() => el.style.opacity = 0, 2000);
         }
 
         function useItem(idx, isAuto = false, itemObj = null) {
             const item = isAuto ? itemObj : items[idx];
             if (!item) return;
-
-            if (item.type === 'potion') {
-                companions.push({ x: player.x, y: player.y, hp: 100, maxHp: 100, dmg: 15, level: 1, cooldown: 0 });
-                renderCompanions(); showAlert("SUMMONED COMPANION!", "#00ff00");
-            }
-            else if (item.type === 'sword') { dmg += item.val; showAlert("DAMAGE INCREASED", "#00ff00"); }
-            else if (item.type === 'hp') { hp = Math.max(1, Math.min(maxHp, hp + item.val)); showAlert("HEALED", "#00ff00"); }
-            else if (item.type === 'shield') { maxHp += item.val; hp += item.val; showAlert("MAX HP UP", "#00ff00"); }
-            else if (item.type === 'curse_dmg') { dmg = Math.max(1, dmg + item.val); showAlert("CURSED: DMG DOWN", "red"); }
-            else if (item.type === 'hp_half') { hp = Math.floor(hp * item.val); showAlert("CURSED: HP HALVED", "red"); }
-            else if (item.type === 'hp_loss') { hp += item.val; showAlert("POISONED: HP LOST", "red"); }
+            if (item.type === 'potion') { companions.push({ x: player.x, y: player.y, hp: 100, maxHp: 100, dmg: 15, level: 1 }); renderCompanions(); }
+            else if (item.type === 'sword') dmg += item.val;
+            else if (item.type === 'hp') hp = Math.min(maxHp, hp + item.val);
+            else if (item.type === 'shield') { maxHp += item.val; hp += item.val; }
+            else if (item.type === 'curse_dmg') dmg = Math.max(1, dmg + item.val);
+            else if (item.type === 'hp_half') hp = Math.floor(hp * item.val);
+            else if (item.type === 'hp_loss') hp += item.val;
 
             if (!isAuto) { items.splice(idx, 1); renderInventory(); }
-            if (hp <= 0) triggerGameOver(false, "Succumbed to Curses");
+            if (hp <= 0) triggerGameOver(false, "The forest took its toll.");
         }
 
         function renderInventory() {
@@ -917,87 +868,50 @@
 
         function toggleDogStats() {
             const modal = document.getElementById('dogStatsModal');
-            if (modal.style.display === 'block') { modal.style.display = 'none'; return; }
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
             const content = document.getElementById('dogStatsContent');
-            content.innerHTML = '';
-            if (companions.length === 0) content.innerHTML = '<p style="text-align:center">No living companions.</p>';
-            else {
-                companions.forEach((dog, i) => {
-                    const row = document.createElement('div'); row.className = 'dog-stat-row';
-                    row.innerHTML = `<span style="color:#00ff00;">Dog ${i + 1}</span><span>Lvl: ${dog.level}</span><span>HP: ${Math.floor(dog.hp)}/${dog.maxHp}</span><span>DMG: ${dog.dmg}</span>`;
-                    content.appendChild(row);
-                });
-            }
-            modal.style.display = 'block';
+            content.innerHTML = companions.length ? '' : 'No dogs active.';
+            companions.forEach((dog, i) => {
+                content.innerHTML += `<div class="dog-stat-row"><span>Dog ${i + 1}</span><span>HP: ${Math.floor(dog.hp)}</span></div>`;
+            });
         }
 
         function tryLoot() {
-            let found = false;
             chests.forEach((c, i) => {
-                if (!c.opened && Math.hypot(player.x - c.x, player.y - c.y) < 50) {
-                    c.opened = true; document.getElementById(`chest-${i}`).remove(); found = true;
-                    if (c.reward.type.includes('curse') || c.reward.type.includes('hp_loss') || c.reward.type.includes('hp_half')) {
-                        useItem(0, true, c.reward);
-                    } else {
-                        items.push(c.reward); renderInventory(); showAlert(`LOOTED: ${c.reward.name}`, "#ffff00");
-                    }
+                if (!c.opened && Math.hypot(player.x - c.x, player.y - c.y) < 60) {
+                    c.opened = true; document.getElementById(`chest-${i}`).remove();
+                    if (c.reward.type.includes('curse') || c.reward.type.includes('hp_loss')) useItem(0, true, c.reward);
+                    else { items.push(c.reward); renderInventory(); showAlert("LOOT FOUND", "yellow"); }
                 }
             });
-            if (!found) showAlert("No chest nearby", "#555");
         }
 
         function toggleInventory() { document.getElementById('inventoryPanel').classList.toggle('visible'); }
 
-        // --- CONTROLS + ADMIN LOGIC ---
         function handleDown(e) {
             const k = e.key.toLowerCase();
-
-            // ADMIN SHORTCUT (CTRL + SHIFT + A)
-            if (e.ctrlKey && e.shiftKey && k === 'a') {
-                document.getElementById('adminPanel').style.display = 'block';
-                // Pre-fill values
-                document.getElementById('admDay').value = currentLevel;
-                document.getElementById('admHp').value = Math.floor(hp);
-                document.getElementById('admDmg').value = dmg;
-                document.getElementById('admSpeed').value = PLAYER_SPEED;
-                return;
-            }
-
+            if (e.ctrlKey && e.shiftKey && k === 'a') document.getElementById('adminPanel').style.display = 'block';
             if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
-                let key = k;
-                if (k === 'arrowup') key = 'w'; if (k === 'arrowdown') key = 's';
-                if (k === 'arrowleft') key = 'a'; if (k === 'arrowright') key = 'd';
+                let key = k.replace('arrow', '').replace('up', 'w').replace('down', 's').replace('left', 'a').replace('right', 'd');
                 keyStates[key] = true;
             }
-            if (k === 'e') tryLoot();
-            if (k === ' ') playerAttack();
-            if (k === 'q' || k === 'alt') toggleInventory();
+            if (k === 'e') tryLoot(); if (k === ' ') playerAttack(); if (k === 'q') toggleInventory();
             if (k === 'o') toggleDogStats();
             if (k >= '1' && k <= '9') useItem(parseInt(k) - 1);
         }
 
         function handleUp(e) {
             const k = e.key.toLowerCase();
-            let key = k;
-            if (k === 'arrowup') key = 'w'; if (k === 'arrowdown') key = 's';
-            if (k === 'arrowleft') key = 'a'; if (k === 'arrowright') key = 'd';
+            let key = k.replace('arrow', '').replace('up', 'w').replace('down', 's').replace('left', 'a').replace('right', 'd');
             keyStates[key] = false;
         }
 
-        // --- ADMIN FUNCTIONS ---
         function applyAdminSettings() {
             currentLevel = parseInt(document.getElementById('admDay').value);
             hp = parseInt(document.getElementById('admHp').value);
-            maxHp = Math.max(maxHp, hp); // Ensure maxHP can hold it
             dmg = parseInt(document.getElementById('admDmg').value);
             PLAYER_SPEED = parseInt(document.getElementById('admSpeed').value);
-
-            updateHUD();
-            document.getElementById('adminPanel').style.display = 'none';
-            showAlert("ADMIN SETTINGS APPLIED", "#00ff00");
-
-            // Visual Indicator of Admin Power
-            document.getElementById('playerIcon').style.border = "3px solid #00ff00";
+            closeAdmin();
         }
         function closeAdmin() { document.getElementById('adminPanel').style.display = 'none'; }
 
@@ -1006,8 +920,7 @@
             timeLeft--;
             if (timeLeft <= 0) {
                 gameState = 'chase';
-                showAlert("THE PACK ARRIVES!", "red");
-                msg("HUNT OR BE HUNTED!");
+                showAlert("RUN!", "red");
             }
         }
 
@@ -1030,31 +943,11 @@
 
         function triggerGameOver(win, reason) {
             gameState = 'over';
-
-            // SAVE HIGH SCORE LOGIC
-            const daysSurvived = currentLevel;
-            const myUser = localStorage.getItem('gameUsername') || "Unknown";
-            const currentHigh = parseInt(localStorage.getItem('feral_highScore') || "0");
-
-            // Update Text
-            const survivalText = document.getElementById('daysSurvivedText');
-            if (win) {
-                survivalText.innerText = "Current Day Completed!";
-            } else {
-                survivalText.innerText = `YOU SURVIVED ${daysSurvived} DAYS`;
-
-                // Save if record broken
-                if (daysSurvived > currentHigh) {
-                    localStorage.setItem('feral_highScore', daysSurvived);
-                    localStorage.setItem('feral_bestPlayer', myUser);
-                    survivalText.innerText += " (NEW RECORD!)";
-                }
-            }
-
             document.getElementById('gameOverOverlay').style.display = 'flex';
             document.getElementById('endTitle').innerText = win ? "VICTORY" : "DEFEAT";
             document.getElementById('endReason').innerText = reason;
             document.getElementById(win ? 'winButtons' : 'lossButtons').style.display = 'block';
+            document.getElementById('daysSurvivedText').innerText = `Day ${currentLevel}`;
         }
 
         function nextLevel() { startLevel(currentLevel + 1); }
