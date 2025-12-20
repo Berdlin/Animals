@@ -210,7 +210,7 @@
             white-space: nowrap;
         }
 
-        /* ADMIN PANEL */
+        /* ADMIN PANEL - SCROLLABLE UPDATE */
         #adminPanel {
             position: absolute;
             top: 50%;
@@ -225,6 +225,26 @@
             color: #00ff00;
             font-family: monospace;
             box-shadow: 0 0 20px #00ff00;
+
+            /* Scroll Logic */
+            max-height: 80vh;
+            /* Limits height to 80% of screen */
+            overflow-y: auto;
+            /* Allows scrolling if content is too tall */
+        }
+
+        /* Custom Scrollbar for Admin Panel */
+        #adminPanel::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #adminPanel::-webkit-scrollbar-track {
+            background: #002200;
+        }
+
+        #adminPanel::-webkit-scrollbar-thumb {
+            background: #00ff00;
+            border-radius: 2px;
         }
 
         #adminPanel h2 {
