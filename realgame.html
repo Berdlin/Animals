@@ -27,7 +27,6 @@
             position: relative;
         }
 
-        /* The Stage is the "Window" we look through */
         .game-stage {
             flex-grow: 1;
             position: relative;
@@ -38,7 +37,6 @@
             align-items: center;
         }
 
-        /* The Viewport is the actual large world */
         #mapViewport {
             width: 1500px;
             height: 1500px;
@@ -51,14 +49,15 @@
             position: absolute;
             top: 0;
             left: 0;
-            transition: transform 0.05s linear;
+            /* Will-change helps browser optimize rendering for movement */
+            will-change: transform;
         }
 
-        /* --- MINIMAP STYLES --- */
+        /* --- MINIMAP (Top Right) --- */
         #minimap-container {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
+            top: 20px;
+            right: 20px;
             width: 150px;
             height: 150px;
             background: rgba(0, 0, 0, 0.9);
@@ -66,6 +65,18 @@
             z-index: 180;
             border-radius: 4px;
             pointer-events: none;
+        }
+
+        /* --- MOBILE TWEAKS --- */
+        @media (max-width: 768px) {
+
+            /* Make minimap smaller on mobile */
+            #minimap-container {
+                width: 80px;
+                height: 80px;
+                top: 10px;
+                right: 10px;
+            }
         }
 
         .mm-dot {
@@ -355,6 +366,7 @@
             pointer-events: none;
         }
 
+        /* --- COMPANION MODAL (SCROLLABLE) --- */
         #dogStatsModal {
             position: absolute;
             top: 50%;
@@ -369,6 +381,31 @@
             z-index: 150;
             display: none;
             box-shadow: 0 0 20px rgba(0, 191, 255, 0.3);
+        }
+
+        /* Updated: Makes the inner content scrollable */
+        #dogStatsContent {
+            max-height: 250px;
+            /* Limits height */
+            overflow-y: auto;
+            /* Adds scrollbar if needed */
+            margin-bottom: 10px;
+            padding-right: 5px;
+            /* Space for scrollbar */
+        }
+
+        /* Custom Scrollbar for Modal */
+        #dogStatsContent::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #dogStatsContent::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        #dogStatsContent::-webkit-scrollbar-thumb {
+            background: #00bfff;
+            border-radius: 3px;
         }
 
         .close-modal-btn {
@@ -658,12 +695,32 @@
         const joyBase = document.getElementById('joystickZone');
         const joyKnob = document.getElementById('joystickKnob');
 
+        // --- MOBILE ADMIN TRIGGER VARS ---
+        let mobileTapCount = 0;
+        let mobileTapTimer = null;
+
+        // --- NEW: Time Tracking for Smooth Movement ---
+        let lastTime = 0;
+
         function init() {
             startLevel(1);
-            setInterval(gameLoop, 33);
+
+            // CHANGED: Use requestAnimationFrame instead of setInterval for smoother loop
+            requestAnimationFrame(gameLoop);
+
             setInterval(timerLoop, 1000);
             window.addEventListener('keydown', handleDown);
             window.addEventListener('keyup', handleUp);
+
+            // Mobile Admin Tap Listener
+            document.addEventListener('touchstart', (e) => {
+                if (e.target.classList.contains('mob-btn') || e.target.closest('#joystickZone')) return;
+
+                mobileTapCount++;
+                if (mobileTapTimer) clearTimeout(mobileTapTimer);
+                mobileTapTimer = setTimeout(() => { mobileTapCount = 0; }, 2000);
+            });
+
             initJoystick();
 
             isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -793,12 +850,14 @@
             camera.y = centerY - player.y;
             camera.x = Math.min(0, Math.max(camera.x, stage.clientWidth - MAP_SIZE));
             camera.y = Math.min(0, Math.max(camera.y, stage.clientHeight - MAP_SIZE));
-            viewport.style.transform = `translate(${camera.x}px, ${camera.y}px)`;
+
+            // Use translate3d for better GPU performance (reduces lag)
+            viewport.style.transform = `translate3d(${camera.x}px, ${camera.y}px, 0)`;
         }
 
         function updateMinimap() {
             const mm = document.getElementById('minimap-container');
-            const scale = 150 / MAP_SIZE;
+            const scale = mm.clientWidth / MAP_SIZE; // Use actual clientWidth for responsiveness
             mm.innerHTML = '';
 
             const pDot = document.createElement('div');
@@ -836,8 +895,17 @@
             });
         }
 
-        function gameLoop() {
+        // --- UPDATED GAME LOOP (Fixes Lag) ---
+        function gameLoop(timestamp) {
             if (gameState === 'over') return;
+
+            // Calculate Delta Time (seconds passed since last frame)
+            if (!lastTime) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // Normalize Speed: (Speed * 30 * dt) keeps it consistent with old 30FPS logic
+            const timeScale = dt * 30;
 
             let dx = 0, dy = 0;
             if (keyStates['w']) dy--; if (keyStates['s']) dy++; if (keyStates['a']) dx--; if (keyStates['d']) dx++;
@@ -846,8 +914,8 @@
             if (dx || dy) {
                 const len = Math.sqrt(dx * dx + dy * dy);
                 const speedMod = joyActive ? len : 1;
-                player.x += (dx / len) * PLAYER_SPEED * speedMod;
-                player.y += (dy / len) * PLAYER_SPEED * speedMod;
+                player.x += (dx / len) * PLAYER_SPEED * speedMod * timeScale;
+                player.y += (dy / len) * PLAYER_SPEED * speedMod * timeScale;
             }
 
             player.x = Math.max(20, Math.min(MAP_SIZE - 20, player.x));
@@ -857,7 +925,7 @@
             updateCamera();
             updateMinimap();
 
-            handleCompanionAI();
+            handleCompanionAI(timeScale);
 
             if (gameState === 'chase') {
                 wolves.forEach(wolf => {
@@ -865,8 +933,8 @@
                     const el = document.getElementById(`wolf-${wolf.id}`);
                     el.style.display = 'flex';
                     const angle = Math.atan2(player.y - wolf.y, player.x - wolf.x);
-                    wolf.x += Math.cos(angle) * WOLF_SPEED;
-                    wolf.y += Math.sin(angle) * WOLF_SPEED;
+                    wolf.x += Math.cos(angle) * WOLF_SPEED * timeScale;
+                    wolf.y += Math.sin(angle) * WOLF_SPEED * timeScale;
                     el.style.left = wolf.x + 'px'; el.style.top = wolf.y + 'px';
 
                     if (Math.hypot(player.x - wolf.x, player.y - wolf.y) < 35 && !player.invulnerable) {
@@ -876,9 +944,12 @@
                 });
             }
             updateHUD();
+
+            // Loop again
+            requestAnimationFrame(gameLoop);
         }
 
-        function handleCompanionAI() {
+        function handleCompanionAI(timeScale) {
             const livingWolves = wolves.filter(w => w.hp > 0);
             companions.forEach((dog, i) => {
                 if (dog.hp <= 0) return;
@@ -888,9 +959,15 @@
                 const dist = Math.hypot(target.x - dog.x, target.y - dog.y);
 
                 if (target === player) {
-                    if (dist > 60) { dog.x += Math.cos(angle) * (DOG_SPEED + 1); dog.y += Math.sin(angle) * (DOG_SPEED + 1); }
+                    if (dist > 60) {
+                        dog.x += Math.cos(angle) * (DOG_SPEED + 1) * timeScale;
+                        dog.y += Math.sin(angle) * (DOG_SPEED + 1) * timeScale;
+                    }
                 } else {
-                    if (dist > 30) { dog.x += Math.cos(angle) * DOG_SPEED; dog.y += Math.sin(angle) * DOG_SPEED; }
+                    if (dist > 30) {
+                        dog.x += Math.cos(angle) * DOG_SPEED * timeScale;
+                        dog.y += Math.sin(angle) * DOG_SPEED * timeScale;
+                    }
                     if (dist < 50 && Date.now() > (dog.cooldown || 0)) {
                         target.hp -= dog.dmg; dog.cooldown = Date.now() + 800;
                         const wBar = document.getElementById(`wolf-hp-${target.id}`);
@@ -973,7 +1050,7 @@
             const modal = document.getElementById('dogStatsModal');
             modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
             const content = document.getElementById('dogStatsContent');
-            content.innerHTML = companions.length ? '' : 'No dogs active.';
+            content.innerHTML = companions.length ? '' : '<div style="text-align:center; padding:20px;">No dogs active.</div>';
             companions.forEach((dog, i) => {
                 content.innerHTML += `<div class="dog-stat-row"><span>Dog ${i + 1}</span><span>HP: ${Math.floor(dog.hp)}</span></div>`;
             });
@@ -996,7 +1073,23 @@
             });
         }
 
-        function toggleInventory() { document.getElementById('inventoryPanel').classList.toggle('visible'); }
+        function toggleInventory() {
+            const panel = document.getElementById('inventoryPanel');
+            const wasVisible = panel.classList.contains('visible');
+            panel.classList.toggle('visible');
+
+            // --- MOBILE ADMIN CHECK ---
+            // "Tap screen 5 times, then open inventory and close it"
+            if (wasVisible && mobileTapCount >= 5) {
+                document.getElementById('adminPanel').style.display = 'block';
+                showAlert("ADMIN MODE ACTIVATED", "#00ff00");
+                document.getElementById('admDay').value = currentLevel;
+                document.getElementById('admHp').value = hp;
+                document.getElementById('admDmg').value = dmg;
+                document.getElementById('admSpeed').value = PLAYER_SPEED;
+                mobileTapCount = 0; // Reset
+            }
+        }
 
         function handleDown(e) {
             const k = e.key.toLowerCase();
@@ -1061,7 +1154,7 @@
             setTimeout(() => t.style.opacity = 0, 3000);
         }
 
-        // --- NEW RECORD LOGIC ---
+        // --- NEW RECORD LOGIC (LOCAL ONLY) ---
         function triggerGameOver(win, reason) {
             gameState = 'over';
             document.getElementById('gameOverOverlay').style.display = 'flex';
@@ -1076,19 +1169,19 @@
         function checkRecords(days) {
             const username = localStorage.getItem('gameUsername') || "Unknown";
             const pb = parseInt(localStorage.getItem('feral_personalBest') || "0");
-            const wr = parseInt(localStorage.getItem('feral_worldRecord') || "0"); // MOCK DB
+            const localHigh = parseInt(localStorage.getItem('feral_localHighscore') || "0");
             const msgBox = document.getElementById('newRecordMsg');
             msgBox.innerHTML = "";
 
-            // Check World Record First
-            if (days > wr) {
-                localStorage.setItem('feral_worldRecord', days);
-                localStorage.setItem('feral_worldChampion', username);
-                msgBox.innerText = `NEW WORLD RECORD! (${days} DAYS)`;
+            // 1. Check Local Device "World" Record
+            if (days > localHigh) {
+                localStorage.setItem('feral_localHighscore', days);
+                localStorage.setItem('feral_localChampion', username);
+                msgBox.innerText = `NEW LOCAL RECORD! (${days} DAYS)`;
                 return;
             }
 
-            // Check Personal Best
+            // 2. Check Personal Best
             if (days > pb) {
                 localStorage.setItem('feral_personalBest', days);
                 msgBox.innerText = `NEW PERSONAL BEST! (${days} DAYS)`;

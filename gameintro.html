@@ -59,7 +59,6 @@
             margin-bottom: 20px;
         }
 
-        /* --- NEW STATS GRID --- */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -226,9 +225,9 @@
                 <div class="record-holder">DAYS SURVIVED</div>
             </div>
             <div class="record-box world">
-                <div class="record-title">WORLD RECORD</div>
-                <div class="record-val" id="wrDisplay">Loading...</div>
-                <div class="record-holder" id="wrHolder">CONNECTING...</div>
+                <div class="record-title">LOCAL DEVICE RECORD</div>
+                <div class="record-val" id="wrDisplay">--</div>
+                <div class="record-holder" id="wrHolder">NO DATA</div>
             </div>
         </div>
 
@@ -276,6 +275,7 @@
                     <ul style="line-height: 2.0;">
                         <li><strong>Joystick</strong>: Move</li>
                         <li><strong>Buttons</strong>: Attack, Loot, Inv, Dogs</li>
+                        <li><strong>Admin Access</strong>: Tap screen 5 times, Open Inventory, Close Inventory.</li>
                     </ul>
                 </div>
             </div>
@@ -285,30 +285,21 @@
     </div>
 
     <script>
-        // LOAD HIGH SCORES
         window.onload = function () {
-            // 1. Load Personal Best
+            // Load Personal Best
             const myBest = localStorage.getItem('feral_personalBest') || "0";
             document.getElementById('pbDisplay').innerText = `${myBest}`;
 
-            // 2. Simulate Loading World Record (For "Online" feel)
-            setTimeout(() => {
-                const worldBest = localStorage.getItem('feral_worldRecord') || "5"; // Default mock world record
-                const worldChamp = localStorage.getItem('feral_worldChampion') || "AlphaTester";
+            // Load Local Device High Score (Instead of Online World Record)
+            const localHigh = localStorage.getItem('feral_localHighscore') || "0";
+            const localChamp = localStorage.getItem('feral_localChampion') || "None";
 
-                document.getElementById('wrDisplay').innerText = worldBest;
-                document.getElementById('wrHolder').innerText = `HELD BY: ${worldChamp.toUpperCase()}`;
-            }, 800); // Small delay to simulate server fetch
+            document.getElementById('wrDisplay').innerText = localHigh;
+            document.getElementById('wrHolder').innerText = `HELD BY: ${localChamp.toUpperCase()}`;
         };
 
-        function openTutorial() {
-            document.getElementById('tutorialModal').style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-        function closeTutorial() {
-            document.getElementById('tutorialModal').style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
+        function openTutorial() { document.getElementById('tutorialModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
+        function closeTutorial() { document.getElementById('tutorialModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
     </script>
 </body>
 

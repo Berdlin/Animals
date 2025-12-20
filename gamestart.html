@@ -14,7 +14,6 @@
             background-color: #000;
             color: #ccc;
             font-family: 'Courier Prime', monospace;
-            /* Changed to allow scrolling */
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -24,7 +23,6 @@
 
         .scanner-line {
             position: fixed;
-            /* Fixed so it doesn't scroll away */
             top: 0;
             left: 0;
             width: 100%;
@@ -42,7 +40,6 @@
             max-width: 500px;
             text-align: left;
             padding: 40px;
-            /* Added margin to prevent cutoff when scrolling */
             margin: 50px 0;
             border: 1px solid #333;
             background-color: rgba(10, 15, 10, 0.95);
@@ -138,12 +135,11 @@
     <div class="scanner-line"></div>
     <div class="container">
         <h1>IDENTITY VERIFICATION</h1>
-        <p style="font-size: 0.8em; color: #666;">SERVER: FER_PURSUIT_ALPHA<br>STATUS: PENDING INPUT</p>
+        <p style="font-size: 0.8em; color: #666;">SERVER: LOCAL_SYS_01<br>STATUS: PENDING INPUT</p>
 
         <label>ENTER CODENAME</label>
         <p class="warning-text">
-            NOTE: Please use the same Username you used before. If the Global Record is updated with a new name,
-            it will be permanently overwritten.
+            NOTE: Your identity will be saved to your local record.
         </p>
         <input type="text" id="singlePlayerUsername" placeholder="USER_ID..." autocomplete="off">
 
@@ -154,16 +150,12 @@
     </div>
 
     <script>
-        // Auto-fill existing username
-        window.onload = function () {
-            const savedName = localStorage.getItem('gameUsername');
-            if (savedName) {
-                document.getElementById('singlePlayerUsername').value = savedName;
-            }
-        }
+        // State to track if the cheat code has been entered
+        let specialAccessUnlocked = false;
 
         function startSinglePlayer() {
-            const username = document.getElementById('singlePlayerUsername').value.trim();
+            const inputField = document.getElementById('singlePlayerUsername');
+            const username = inputField.value.trim();
             const errorMessage = document.getElementById('error-message');
 
             if (username.length === 0) {
@@ -171,14 +163,41 @@
                 return;
             }
 
-            // Store the username
-            localStorage.setItem('gameUsername', username);
-            errorMessage.style.color = '#0f0';
-            errorMessage.textContent = '>> IDENTITY CONFIRMED. CONNECTING TO WORLD SERVER...';
+            // --- IDENTITY PROTECTION LOGIC ---
 
+            // 1. Check for the unlock phrase
+            if (username === "bereketisthebest") {
+                specialAccessUnlocked = true;
+                errorMessage.style.color = "#0f0";
+                errorMessage.textContent = ">> SYSTEM OVERRIDE ACCEPTED. NAME 'beka_ei' UNLOCKED.";
+                inputField.value = ""; // Clear for them to type the real name
+                return;
+            }
+
+            // 2. Check if they are trying to use the restricted name
+            if (username.toLowerCase() === "beka_ei") {
+                if (!specialAccessUnlocked) {
+                    errorMessage.style.color = "#f00";
+                    errorMessage.textContent = ">> ACCESS DENIED: RESTRICTED IDENTITY. AUTHORIZATION REQUIRED.";
+                    return;
+                } else {
+                    // If they have unlocked it, allow it.
+                    proceedToGame(username, errorMessage);
+                    return;
+                }
+            }
+
+            // 3. Normal user
+            proceedToGame(username, errorMessage);
+        }
+
+        function proceedToGame(name, errorEl) {
+            localStorage.setItem('gameUsername', name);
+            errorEl.style.color = '#0f0';
+            errorEl.textContent = '>> IDENTITY CONFIRMED. LOADING...';
             setTimeout(() => {
                 window.location.href = 'realgame.html';
-            }, 800);
+            }, 1000);
         }
     </script>
 </body>
