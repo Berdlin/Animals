@@ -14,15 +14,17 @@
             background-color: #000;
             color: #ccc;
             font-family: 'Courier Prime', monospace;
-            height: 100vh;
+            /* Changed to allow scrolling */
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
+            overflow-y: auto;
         }
 
         .scanner-line {
-            position: absolute;
+            position: fixed;
+            /* Fixed so it doesn't scroll away */
             top: 0;
             left: 0;
             width: 100%;
@@ -40,6 +42,8 @@
             max-width: 500px;
             text-align: left;
             padding: 40px;
+            /* Added margin to prevent cutoff when scrolling */
+            margin: 50px 0;
             border: 1px solid #333;
             background-color: rgba(10, 15, 10, 0.95);
             box-shadow: 0 0 30px rgba(0, 255, 0, 0.1);
@@ -60,6 +64,15 @@
             color: #ff4500;
             font-size: 0.9em;
             letter-spacing: 2px;
+        }
+
+        .warning-text {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 5px;
+            font-style: italic;
+            border-left: 2px solid #555;
+            padding-left: 10px;
         }
 
         input[type="text"] {
@@ -128,6 +141,10 @@
         <p style="font-size: 0.8em; color: #666;">SERVER: FER_PURSUIT_ALPHA<br>STATUS: PENDING INPUT</p>
 
         <label>ENTER CODENAME</label>
+        <p class="warning-text">
+            NOTE: Please use the same Username you used before. If the Global Record is updated with a new name,
+            it will be permanently overwritten.
+        </p>
         <input type="text" id="singlePlayerUsername" placeholder="USER_ID..." autocomplete="off">
 
         <button class="btn" onclick="startSinglePlayer()">INITIATE SEQUENCE</button>
@@ -137,6 +154,14 @@
     </div>
 
     <script>
+        // Auto-fill existing username
+        window.onload = function () {
+            const savedName = localStorage.getItem('gameUsername');
+            if (savedName) {
+                document.getElementById('singlePlayerUsername').value = savedName;
+            }
+        }
+
         function startSinglePlayer() {
             const username = document.getElementById('singlePlayerUsername').value.trim();
             const errorMessage = document.getElementById('error-message');
@@ -149,7 +174,7 @@
             // Store the username
             localStorage.setItem('gameUsername', username);
             errorMessage.style.color = '#0f0';
-            errorMessage.textContent = '>> IDENTITY CONFIRMED. LOADING...';
+            errorMessage.textContent = '>> IDENTITY CONFIRMED. CONNECTING TO WORLD SERVER...';
 
             setTimeout(() => {
                 window.location.href = 'realgame.html';
