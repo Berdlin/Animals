@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feral Pursuit - Enter Username</title>
+    <title>Feral Pursuit - Identity</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@300;400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime&family=Cinzel:wght@700&display=swap');
 
         body {
             margin: 0;
             padding: 0;
-            background-color: #050505;
-            background-image: radial-gradient(circle at center, #1a0a0a 0%, #000000 100%);
-            color: #e0e0e0;
-            font-family: 'Lato', sans-serif;
+            background-color: #000;
+            color: #ccc;
+            font-family: 'Courier Prime', monospace;
             height: 100vh;
             display: flex;
             justify-content: center;
@@ -21,82 +21,119 @@
             overflow: hidden;
         }
 
-        .background-fx {
+        .scanner-line {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: url('https://www.transparenttextures.com/patterns/dark-matter.png');
-            opacity: 0.3;
-            animation: pulseBg 10s infinite alternate;
-            z-index: 0;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: rgba(0, 255, 0, 0.3);
+            box-shadow: 0 0 10px #0f0;
+            animation: scan 3s infinite linear;
+            z-index: 5;
+            pointer-events: none;
         }
 
         .container {
-            position: relative;
             z-index: 10;
-            max-width: 400px;
-            text-align: center;
+            width: 90%;
+            max-width: 500px;
+            text-align: left;
             padding: 40px;
-            border: 2px solid #500;
-            background-color: rgba(0, 0, 0, 0.8);
-            box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);
-            border-radius: 10px;
-            animation: fadeIn 1.5s ease-out;
+            border: 1px solid #333;
+            background-color: rgba(10, 15, 10, 0.95);
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.1);
         }
 
         h1 {
             font-family: 'Cinzel', serif;
+            color: #ddd;
+            font-size: 2em;
+            border-bottom: 2px solid #ff4500;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        label {
+            display: block;
+            margin-top: 20px;
             color: #ff4500;
-            font-size: 2.5em;
-            text-shadow: 0 0 10px rgba(255, 69, 0, 0.7);
-            margin-bottom: 20px;
+            font-size: 0.9em;
+            letter-spacing: 2px;
         }
 
         input[type="text"] {
-            width: 90%;
+            width: 100%;
             padding: 15px;
-            margin: 10px 0 20px 0;
-            border: 2px solid #ff4500;
-            background-color: #1a1a1a;
-            color: #fff;
-            font-size: 1.1em;
-            border-radius: 5px;
-            box-shadow: inset 0 0 5px rgba(255, 69, 0, 0.5);
-            text-align: center;
+            margin-top: 10px;
+            background: #000;
+            border: 1px solid #444;
+            color: #0f0;
+            font-family: 'Courier Prime', monospace;
+            font-size: 1.2em;
+            box-sizing: border-box;
         }
-        
-        /* Button style reused from gameintro */
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #0f0;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+
         .btn {
             display: block;
             width: 100%;
-            padding: 15px 30px;
-            background-color: #300;
+            padding: 20px;
+            margin-top: 30px;
+            background-color: #1a1a1a;
             color: #fff;
-            text-decoration: none;
+            border: 1px solid #ff4500;
             font-family: 'Cinzel', serif;
             font-size: 1.2em;
-            border: 2px solid #ff4500;
-            border-radius: 5px;
-            position: relative;
-            overflow: hidden;
-            z-index: 1;
-            transition: all 0.3s ease-in-out;
             cursor: pointer;
+            transition: 0.3s;
         }
 
-        .btn:hover { transform: scale(1.02); box-shadow: 0 0 40px rgba(255, 69, 0, 0.8); }
+        .btn:hover {
+            background-color: #ff4500;
+            color: #000;
+        }
 
-        @keyframes pulseBg { from { transform: scale(1); } to { transform: scale(1.02); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scan {
+            0% {
+                top: 0;
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                top: 100%;
+                opacity: 0;
+            }
+        }
     </style>
 </head>
+
 <body>
-    <div class="background-fx"></div>
+    <div class="scanner-line"></div>
     <div class="container">
-        <h1>Identify Yourself</h1>
-        <input type="text" id="singlePlayerUsername" placeholder="Enter Your Username" required>
-        <button class="btn" onclick="startSinglePlayer()">Start Game</button>
-        <p id="error-message" style="color: #ff4500; margin-top: 15px;"></p>
-        <a href="gameintro.html" style="color:#aaa; display: block; margin-top: 20px;">Go Back</a>
+        <h1>IDENTITY VERIFICATION</h1>
+        <p style="font-size: 0.8em; color: #666;">SERVER: FER_PURSUIT_ALPHA<br>STATUS: PENDING INPUT</p>
+
+        <label>ENTER CODENAME</label>
+        <input type="text" id="singlePlayerUsername" placeholder="USER_ID..." autocomplete="off">
+
+        <button class="btn" onclick="startSinglePlayer()">INITIATE SEQUENCE</button>
+        <p id="error-message" style="color: #ff0000; margin-top: 15px; min-height: 20px;"></p>
+
+        <a href="gameintro.html" style="color:#444; text-decoration: none; font-size: 0.8em;">[ ABORT MISSION ]</a>
     </div>
 
     <script>
@@ -105,16 +142,20 @@
             const errorMessage = document.getElementById('error-message');
 
             if (username.length === 0) {
-                errorMessage.textContent = 'A name is required for the hunt.';
+                errorMessage.textContent = '>> ERROR: NULL IDENTITY DETECTED';
                 return;
             }
 
-            // Store the username for the game
+            // Store the username
             localStorage.setItem('gameUsername', username);
-            
-            // Redirect to the actual game
-            window.location.href = 'realgame.html';
+            errorMessage.style.color = '#0f0';
+            errorMessage.textContent = '>> IDENTITY CONFIRMED. LOADING...';
+
+            setTimeout(() => {
+                window.location.href = 'realgame.html';
+            }, 800);
         }
     </script>
 </body>
+
 </html>

@@ -1,24 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feral Pursuit</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Feral Pursuit - Survival</title>
     <style>
-        /* --- CORE VISUALS --- */
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            background-color: #080808; 
-            color: #ccc; 
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #080808;
+            color: #ccc;
             margin: 0;
             height: 100vh;
-            overflow: hidden; /* NO SCROLLING ON PAGE */
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
+            touch-action: none;
+            user-select: none;
         }
 
-        /* --- LAYOUT --- */
         .game-wrapper {
             display: flex;
             width: 100%;
@@ -26,7 +27,6 @@
             position: relative;
         }
 
-        /* MAP AREA (Full Screen Feel) */
         .game-stage {
             flex-grow: 1;
             position: relative;
@@ -44,29 +44,27 @@
             border: 2px solid #333;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
         }
 
-        /* --- INVENTORY SIDEBAR (Toggleable) --- */
+        /* Inventory Panel */
         .inventory-sidebar {
             width: 280px;
             background-color: #111;
-            border-right: 2px solid #333; /* Border on the right edge */
+            border-right: 2px solid #333;
             height: 100vh;
             position: absolute;
-            left: 0; /* Positioned on the left */
-            right: auto;
+            left: 0;
             top: 0;
-            transform: translateX(-100%); /* Start hidden off the left */
+            transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
             z-index: 100;
             display: flex;
             flex-direction: column;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.5); /* Shadow on the right */
         }
 
         .inventory-sidebar.visible {
-            transform: translateX(0); /* Slide in to be visible */
+            transform: translateX(0);
         }
 
         .inv-header {
@@ -74,21 +72,15 @@
             background-color: #1a1a1a;
             text-align: center;
             color: #ff4500;
-            font-family: 'Georgia', serif;
             font-size: 1.2em;
             border-bottom: 1px solid #333;
         }
 
         .inv-list {
             flex-grow: 1;
-            overflow-y: auto; /* SCROLLABLE INVENTORY */
+            overflow-y: auto;
             padding: 10px;
         }
-        
-        /* Custom Scrollbar for Inventory */
-        .inv-list::-webkit-scrollbar { width: 8px; }
-        .inv-list::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        .inv-list::-webkit-scrollbar-track { background: #000; }
 
         .inv-item {
             background: #222;
@@ -99,498 +91,976 @@
             display: flex;
             align-items: center;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        .inv-item:hover { background: #2a2a2a; border-color: #555; }
-        .inv-item.active { border-color: #ff4500; background: #2a1414; }
 
         .key-hint {
-            background: #ff4500; color: #000; font-weight: bold;
-            width: 20px; height: 20px; border-radius: 3px;
-            display: flex; justify-content: center; align-items: center;
-            margin-right: 10px; font-size: 0.8em;
+            background: #ff4500;
+            color: #000;
+            font-weight: bold;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 10px;
+            font-size: 0.8em;
         }
 
-        /* --- HUD ELEMENTS --- */
+        /* Stats HUD */
         .hud-top {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 40px; z-index: 50;
-            background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 30px;
-            border: 1px solid #333; pointer-events: none;
-        }
-        .hud-stat { font-size: 1.2em; color: #fff; }
-        .hud-stat span { color: #ff4500; font-weight: bold; }
-        
-        /* Alpha Wolf HP Bar - NEW */
-        #wolfHPBar {
-            position: absolute; top: 5px; width: 100%; height: 5px; 
-            background: #444; overflow: hidden; display: none;
-        }
-        #wolfHPCurrent {
-            height: 100%; background: red; transition: width 0.2s;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 50;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid #333;
+            white-space: nowrap;
         }
 
-        /* --- GAME ENTITIES --- */
-        .icon { position: absolute; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; }
-        #playerIcon { font-size: 2em; width: 40px; height: 40px; background: #ff4500; border-radius: 50%; border: 2px solid #fff; z-index: 10; }
-        #wolfIcon { 
-            font-size: 2.5em; width: 50px; height: 50px; background: #500; border-radius: 50%; border: 2px solid #f00; z-index: 9; 
-            /* Include HP bar */
-            position: relative; /* important for inner HP bar */
-        }
-        
-        /* Friendly Wolf */
-        #friendlyWolfIcon {
-            font-size: 1.5em; width: 30px; height: 30px; 
-            background: #00bfff; border-radius: 50%; border: 2px solid #fff; 
-            z-index: 9; display: none; transition: width 0.3s, height 0.3s, background-color 0.1s;
+        .hud-stat {
+            font-size: 1.0em;
+            color: #fff;
         }
 
-        .chest { font-size: 1.8em; z-index: 8; cursor: pointer; }
-        .chest-bad::after { content: ''; position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: red; border-radius: 50%; }
+        .hud-stat span {
+            color: #ff4500;
+            font-weight: bold;
+        }
 
-        /* Story Overlay (New Position) */
-        #storyText {
-            position: absolute; top: 80px; left: 20px; /* Text on the left of the play bar */
-            width: 250px; /* Constrain width */
-            text-align: left; 
-            background: rgba(0,0,0,0.9);
-            padding: 10px; border-radius: 4px; color: #fff; 
-            border-left: 3px solid #00bfff; /* Highlight border */
-            z-index: 20;
+        /* Alerts */
+        #topAlertBox {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px 30px;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.2em;
+            z-index: 150;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 2px solid transparent;
             pointer-events: none;
-            font-size: 0.9em;
+            white-space: nowrap;
         }
 
-        /* --- Game Over --- */
+        /* ADMIN PANEL */
+        #adminPanel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            z-index: 300;
+            display: none;
+            color: #00ff00;
+            font-family: monospace;
+            box-shadow: 0 0 20px #00ff00;
+        }
+
+        #adminPanel h2 {
+            margin-top: 0;
+            border-bottom: 1px solid #00ff00;
+        }
+
+        .admin-row {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-input {
+            width: 60px;
+            background: #222;
+            border: 1px solid #00ff00;
+            color: #fff;
+            padding: 5px;
+        }
+
+        .admin-btn {
+            width: 100%;
+            background: #003300;
+            border: 1px solid #00ff00;
+            color: #fff;
+            padding: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .admin-btn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        /* Entities */
+        .icon {
+            position: absolute;
+            transform: translate(-50%, -50%);
+        }
+
+        #playerIcon {
+            font-size: 2em;
+            width: 40px;
+            height: 40px;
+            background: #ff4500;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 10;
+        }
+
+        .invulnerable {
+            animation: flash 0.2s infinite;
+        }
+
+        @keyframes flash {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .wolf-entity {
+            font-size: 2.5em;
+            width: 50px;
+            height: 50px;
+            background: #500;
+            border-radius: 50%;
+            border: 2px solid #f00;
+            z-index: 9;
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: translate(-50%, -50%);
+        }
+
+        .bar-container {
+            position: absolute;
+            top: -10px;
+            width: 100%;
+            height: 5px;
+            background: #444;
+            border: 1px solid #000;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.1s;
+        }
+
+        .friendly-wolf {
+            font-size: 1.5em;
+            width: 30px;
+            height: 30px;
+            background: #00bfff;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 9;
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: translate(-50%, -50%);
+        }
+
+        .chest {
+            font-size: 1.8em;
+            z-index: 8;
+            cursor: pointer;
+        }
+
+        #storyText {
+            position: absolute;
+            top: 150px;
+            left: 20px;
+            width: 250px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            border-radius: 4px;
+            color: #fff;
+            border-left: 3px solid #00bfff;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        #dogStatsModal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background: rgba(10, 15, 30, 0.95);
+            border: 2px solid #00bfff;
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            z-index: 150;
+            display: none;
+            box-shadow: 0 0 20px rgba(0, 191, 255, 0.3);
+        }
+
+        .dog-stat-row {
+            border-bottom: 1px solid #444;
+            padding: 10px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Game Over */
         #gameOverOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); display: none; 
-            justify-content: center; align-items: center; flex-direction: column; z-index: 200;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 200;
         }
-        .restart-btn { margin-top: 20px; padding: 15px 30px; background: #ff4500; color: white; text-decoration: none; font-size: 1.2em; border-radius: 5px; }
 
+        .overlay-btn {
+            margin: 10px;
+            padding: 15px 30px;
+            background: #ff4500;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 5px;
+            font-size: 1.2em;
+        }
+
+        .attack-range {
+            position: absolute;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: ripple 0.3s linear;
+        }
+
+        @keyframes ripple {
+            from {
+                width: 0;
+                height: 0;
+                opacity: 1;
+            }
+
+            to {
+                width: 120px;
+                height: 120px;
+                opacity: 0;
+            }
+        }
+
+        /* Mobile Controls */
+        .mobile-controls-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .mobile-controls-layer {
+                display: block;
+            }
+
+            #mapViewport {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
+        }
+
+        #joystickZone {
+            position: absolute;
+            bottom: 50px;
+            left: 40px;
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #joystickKnob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 69, 0, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 0 10px #ff4500;
+        }
+
+        .action-btn-group {
+            position: absolute;
+            bottom: 40px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            pointer-events: auto;
+        }
+
+        .mob-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(50, 50, 50, 0.9);
+            border: 2px solid #fff;
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .mob-btn:active {
+            background: #ff4500;
+            transform: scale(0.9);
+        }
+
+        #btnAttack {
+            width: 90px;
+            height: 90px;
+            background: rgba(200, 0, 0, 0.7);
+            border-color: #ff4500;
+            font-size: 2em;
+        }
+
+        #btnLoot {
+            background: rgba(0, 191, 255, 0.7);
+            border-color: #00bfff;
+            font-size: 1.5em;
+        }
+
+        .small-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        #btnInventory,
+        #btnDogs {
+            width: 50px;
+            height: 50px;
+            font-size: 0.8em;
+            background: #333;
+        }
     </style>
 </head>
-<body>
 
+<body>
     <div class="game-wrapper">
-        
         <div id="inventoryPanel" class="inventory-sidebar">
-            <div class="inv-header">INVENTORY [Q/ALT]</div>
-            <div class="inv-list" id="invList">
-                </div>
+            <div class="inv-header">INVENTORY [Q]</div>
+            <div class="inv-list" id="invList"></div>
         </div>
-        
+
         <div class="hud-top">
-            <div class="hud-stat">HP: <span id="hpDisplay">10</span></div>
-            <div class="hud-stat">TIME: <span id="timeDisplay">01:00</span></div>
-            <div class="hud-stat">DMG: <span id="dmgDisplay">1</span></div>
+            <div class="hud-stat">DAY: <span id="levelDisplay">1</span></div>
+            <div class="hud-stat">HP: <span id="hpDisplay">100</span></div>
+            <div class="hud-stat">DMG: <span id="dmgDisplay">10</span></div>
+            <div class="hud-stat">TIME: <span id="timeDisplay">00:20</span></div>
+        </div>
+
+        <div id="topAlertBox"></div>
+
+        <div id="adminPanel">
+            <h2>ADMIN CONSOLE</h2>
+            <div class="admin-row">
+                <label>Set Day:</label>
+                <input type="number" id="admDay" class="admin-input" value="1">
+            </div>
+            <div class="admin-row">
+                <label>Set HP:</label>
+                <input type="number" id="admHp" class="admin-input" value="100">
+            </div>
+            <div class="admin-row">
+                <label>Set DMG:</label>
+                <input type="number" id="admDmg" class="admin-input" value="10">
+            </div>
+            <div class="admin-row">
+                <label>Player Speed:</label>
+                <input type="number" id="admSpeed" class="admin-input" value="6">
+            </div>
+            <button class="admin-btn" onclick="applyAdminSettings()">APPLY CHANGES</button>
+            <button class="admin-btn" onclick="closeAdmin()">CLOSE</button>
         </div>
 
         <div class="game-stage">
             <div id="mapViewport">
                 <div id="playerIcon" class="icon">🏃</div>
-                <div id="wolfIcon" class="icon" style="left: -100px;">
-                    <div id="wolfHPBar"><div id="wolfHPCurrent" style="width: 100%;"></div></div>
-                    🐺
-                </div>
-                <div id="friendlyWolfIcon" class="icon">🐕</div>
-                
+                <div id="wolvesContainer"></div>
+                <div id="companionsContainer"></div>
                 <div id="mapItems"></div>
-                <div id="effectsLayer"></div>
+                <div id="fxLayer"></div>
             </div>
-            
-            <div id="storyText">
-                Press <strong>Q</strong> or <strong>Alt</strong> to toggle Inventory.<br>
-                Find the <strong>Potion</strong> to summon help!
+
+            <div id="storyText"></div>
+
+            <div id="dogStatsModal">
+                <h2 style="text-align:center; margin-top:0; color:#00bfff;">Companion Pack</h2>
+                <div id="dogStatsContent"></div>
+                <p style="text-align:center; font-size:0.8em; color:#888;">Press 'O' or 🐕 to close</p>
+            </div>
+
+            <div class="mobile-controls-layer">
+                <div id="joystickZone">
+                    <div id="joystickKnob"></div>
+                </div>
+                <div class="action-btn-group">
+                    <div class="small-btn-group">
+                        <div class="mob-btn" id="btnDogs" ontouchstart="toggleDogStats()">🐕</div>
+                        <div class="mob-btn" id="btnInventory" ontouchstart="toggleInventory()">INV</div>
+                    </div>
+                    <div class="mob-btn" id="btnLoot" ontouchstart="tryLoot()">👋</div>
+                    <div class="mob-btn" id="btnAttack" ontouchstart="playerAttack()">⚔️</div>
+                </div>
             </div>
         </div>
-
     </div>
 
     <div id="gameOverOverlay">
         <h1 id="endTitle" style="color:white; font-size:3em;">GAME OVER</h1>
-        <p id="endReason" style="color:#aaa; font-size:1.5em;"></p>
-        <a href="gameintro.html" class="restart-btn">Try Again</a>
+
+        <h2 id="daysSurvivedText" style="color: #ffaa00; font-family: 'Courier New', monospace; margin: 0;"></h2>
+
+        <p id="endReason" style="color:#aaa; font-size:1.5em; margin-bottom: 30px;"></p>
+
+        <div id="lossButtons" style="display: none;">
+            <button onclick="resetGame()" class="overlay-btn">Restart (Day 1)</button>
+            <button onclick="exitGame()" class="overlay-btn" style="background:#555;">Main Menu</button>
+        </div>
+
+        <div id="winButtons" style="display: none;">
+            <button onclick="nextLevel()" class="overlay-btn" style="background:#4CAF50">Next Day</button>
+        </div>
     </div>
 
     <script>
-        // --- CONFIG & STATE ---
-        const PLAYER_SPEED = 6;
-        const WOLF_SPEED = 5;
+        let PLAYER_SPEED = 6;
+        const WOLF_SPEED = 4.0;
+        const DOG_SPEED = 5.5;
         const MAP_SIZE = 600;
-        const MAX_WOLF_HP = 50;
-        
-        let player = { x: 300, y: 300 };
-        let wolf = { x: -100, y: -100 }; // Offscreen initially
-        let companion = { x: 300, y: 300, active: false, level: 1 };
-        
-        let gameState = 'collection'; // collection, chase, battle, over
-        let timeLeft = 60;
-        let hp = 10;
-        let dmg = 1;
-        let wolfHp = MAX_WOLF_HP;
-        
-        let items = []; // Inventory array
-        let chests = [];
-        let keyStates = {};
-        
-        // ADAD Upgrade Logic
-        let adadBuffer = []; // Store last 4 keys
 
-        // --- INIT ---
+        let currentLevel = 1; // Actually Day
+        let player = { x: 300, y: 300, invulnerable: false };
+        let wolves = [];
+        let companions = [];
+        let gameState = 'collection';
+        let timeLeft = 20;
+        let hp = 100, maxHp = 100, dmg = 10;
+        let items = [], chests = [], keyStates = {};
+
+        // Joystick vars
+        let joyActive = false;
+        let joyData = { x: 0, y: 0 };
+        const joyBase = document.getElementById('joystickZone');
+        const joyKnob = document.getElementById('joystickKnob');
+
         function init() {
-            spawnChests();
-            renderInventory();
-            
-            // Loop & Timer
+            startLevel(1);
             setInterval(gameLoop, 33);
             setInterval(timerLoop, 1000);
-            
-            // Input Listeners
             window.addEventListener('keydown', handleDown);
             window.addEventListener('keyup', handleUp);
+            initJoystick();
+
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                document.querySelector('.mobile-controls-layer').style.display = 'block';
+            }
         }
 
-        // --- CHESTS & ITEMS ---
-        function spawnChests() {
-            // Define positions
-            const pos = [
-                {x:100,y:100}, {x:300,y:100}, {x:500,y:100},
-                {x:100,y:300},                {x:500,y:300},
-                {x:100,y:500}, {x:300,y:500}, {x:500,y:500}
-            ];
+        function initJoystick() {
+            joyBase.addEventListener('touchstart', (e) => { joyActive = true; updateJoy(e.touches[0]); }, { passive: false });
+            joyBase.addEventListener('touchmove', (e) => { if (joyActive) { e.preventDefault(); updateJoy(e.touches[0]); } }, { passive: false });
+            joyBase.addEventListener('touchend', () => { joyActive = false; joyData = { x: 0, y: 0 }; joyKnob.style.transform = `translate(-50%, -50%)`; });
+        }
 
-            // Loot Table
-            const loot = [
-                { name: "Summoning Potion", type: "potion", icon: "🧪", rare: true }, // GUARANTEED ONCE
-                { name: "Iron Sword (+2 DMG)", type: "dmg", val: 2, icon: "⚔️" },
-                { name: "Health Elixir (+20 HP)", type: "hp", val: 20, icon: "🍷" },
-                { name: "Rotten Flesh (-5 HP)", type: "bad", val: -5, icon: "🥩" },
-                { name: "Rusty Dagger (+1 DMG)", type: "dmg", val: 1, icon: "🗡️" },
-                { name: "Magic Shield (+50 HP)", type: "hp", val: 50, icon: "🛡️" },
-                { name: "Cursed Skull (-2 DMG)", type: "bad_dmg", val: -2, icon: "💀" },
-            ];
+        function updateJoy(touch) {
+            const rect = joyBase.getBoundingClientRect();
+            let dx = touch.clientX - (rect.left + rect.width / 2);
+            let dy = touch.clientY - (rect.top + rect.height / 2);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = rect.width / 2;
+            if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
+            joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            joyData.x = dx / maxDist; joyData.y = dy / maxDist;
+        }
 
-            // Ensure potion exists in first chest for testing/gameplay flow
-            chests.push({ ...pos[0], opened: false, reward: loot.find(i => i.type === 'potion') || loot[0] });
+        function resetGame() {
+            currentLevel = 1;
+            hp = 100; maxHp = 100; dmg = 10;
+            companions = [];
+            items = [];
+            startLevel(1);
+        }
 
-            for(let i=1; i<pos.length; i++) {
-                const randItem = loot[Math.floor(Math.random() * loot.length)];
-                chests.push({ ...pos[i], opened: false, reward: randItem });
+        function exitGame() { window.location.href = 'gameintro.html'; }
+
+        function startLevel(lvl) {
+            currentLevel = lvl;
+            gameState = 'collection';
+            timeLeft = 20;
+            player.x = 300; player.y = 300;
+
+            companions.forEach(dog => {
+                dog.level++;
+                dog.maxHp += 20;
+                dog.hp = Math.min(dog.maxHp, dog.hp + 50);
+                dog.dmg += 5;
+                dog.x = player.x; dog.y = player.y;
+            });
+
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            document.getElementById('lossButtons').style.display = 'none';
+            document.getElementById('winButtons').style.display = 'none';
+            document.getElementById('dogStatsModal').style.display = 'none';
+
+            spawnChests(lvl);
+            spawnWolves(lvl);
+            renderCompanions();
+            updateHUD();
+
+            if (lvl === 1) {
+                showAlert("DAY 1: CURSED LOOT DETECTED", "red");
+                msg("Day 1: Only 1 Wolf, but 60% of Loot is BAD!");
+            } else {
+                showAlert(`DAY ${lvl}: THE PACK GROWS`, "#00bfff");
+                msg(`Day ${lvl}: Better Loot, More Wolves.`);
             }
+        }
 
+        function spawnWolves(level) {
+            wolves = [];
+            const container = document.getElementById('wolvesContainer');
+            container.innerHTML = '';
+            let count = (level === 1) ? 1 : Math.min(level + 1, 25);
+            const wolfHP = level * 80 + 50;
+            const wolfDMG = level * 5 + 5;
+
+            for (let i = 0; i < count; i++) {
+                let wx = Math.random() > 0.5 ? -50 : MAP_SIZE + 50;
+                let wy = Math.random() * MAP_SIZE;
+                wolves.push({ id: i, x: wx, y: wy, hp: wolfHP, maxHp: wolfHP, dmg: wolfDMG, targetedBy: null });
+                const el = document.createElement('div');
+                el.className = 'wolf-entity'; el.id = `wolf-${i}`; el.style.display = 'none';
+                el.innerHTML = `<div class="bar-container"><div class="bar-fill" id="wolf-hp-${i}" style="width: 100%; background:red;"></div></div>🐺`;
+                container.appendChild(el);
+            }
+        }
+
+        function spawnChests(level) {
+            chests = [];
+            for (let i = 0; i < 8; i++) {
+                chests.push({
+                    x: Math.random() * (MAP_SIZE - 40) + 20,
+                    y: Math.random() * (MAP_SIZE - 40) + 20,
+                    opened: false,
+                    reward: generateReward(level)
+                });
+            }
             drawChests();
+        }
+
+        function generateReward(level) {
+            const rand = Math.random() * 100;
+            let badChance = (level === 1) ? 60 : 25;
+
+            if (rand < badChance) {
+                const badPool = [
+                    { name: "Cursed Blade", type: "curse_dmg", val: -5, icon: "💀", desc: "-5 DMG" },
+                    { name: "Blood Debt", type: "hp_half", val: 0.5, icon: "🩸", desc: "Halves HP" },
+                    { name: "Rotten Flesh", type: "hp_loss", val: -20, icon: "🥩", desc: "-20 HP" },
+                ];
+                return badPool[Math.floor(Math.random() * badPool.length)];
+            } else if (rand < badChance + 15) {
+                return { name: "Summoning Potion", type: "potion", icon: "🐕", desc: "Summons Dog" };
+            } else {
+                const pool = [
+                    { name: "Iron Sword", type: "sword", val: 10, icon: "⚔️", desc: "+10 DMG" },
+                    { name: "Health Elixir", type: "hp", val: 30, icon: "🍷", desc: "+30 HP" },
+                    { name: "Magic Shield", type: "shield", val: 50, icon: "🛡️", desc: "+50 MaxHP" }
+                ];
+                return pool[Math.floor(Math.random() * pool.length)];
+            }
         }
 
         function drawChests() {
             const container = document.getElementById('mapItems');
             container.innerHTML = '';
             chests.forEach((c, i) => {
-                if(c.opened) return;
+                if (c.opened) return;
                 const el = document.createElement('div');
-                el.className = 'icon chest ' + (c.reward.type.includes('bad') ? 'chest-bad' : '');
-                el.innerText = '📦';
-                el.style.left = c.x + 'px';
-                el.style.top = c.y + 'px';
+                el.className = 'icon chest'; el.innerText = '📦';
+                el.id = `chest-${i}`;
+                el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
                 container.appendChild(el);
             });
         }
 
-        // --- GAME LOOP ---
         function gameLoop() {
-            if(gameState === 'over') return;
+            if (gameState === 'over') return;
 
-            // 1. Movement
-            let dx=0, dy=0;
-            if(keyStates['w']) dy--;
-            if(keyStates['s']) dy++;
-            if(keyStates['a']) dx--;
-            if(keyStates['d']) dx++;
-            
-            // Normalize
-            if(dx||dy) {
-                const len = Math.sqrt(dx*dx + dy*dy);
-                player.x += (dx/len)*PLAYER_SPEED;
-                player.y += (dy/len)*PLAYER_SPEED;
+            let dx = 0, dy = 0;
+            if (keyStates['w']) dy--; if (keyStates['s']) dy++; if (keyStates['a']) dx--; if (keyStates['d']) dx++;
+            if (joyActive) { dx = joyData.x; dy = joyData.y; }
+
+            if (dx || dy) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) {
+                    const speedMod = joyActive ? len : 1;
+                    player.x += (dx / len) * PLAYER_SPEED * speedMod;
+                    player.y += (dy / len) * PLAYER_SPEED * speedMod;
+                }
             }
-            
-            // Clamp
-            player.x = Math.max(20, Math.min(MAP_SIZE-20, player.x));
-            player.y = Math.max(20, Math.min(MAP_SIZE-20, player.y));
 
+            player.x = Math.max(20, Math.min(MAP_SIZE - 20, player.x));
+            player.y = Math.max(20, Math.min(MAP_SIZE - 20, player.y));
             updateIcon('playerIcon', player);
 
-            // 2. Interaction (E)
-            if(keyStates['e']) {
-                checkChests();
-                keyStates['e'] = false; // Trigger once
-            }
+            handleCompanionAI();
 
-            // 3. Companion Logic (Follows Player)
-            if(companion.active) {
-                const cEl = document.getElementById('friendlyWolfIcon');
-                cEl.style.display = 'flex';
-                
-                // Simple follow
-                companion.x += (player.x - companion.x) * 0.1;
-                companion.y += (player.y - companion.y) * 0.1;
-                updateIcon('friendlyWolfIcon', companion);
-            }
+            if (gameState === 'chase') {
+                wolves.forEach(wolf => {
+                    if (wolf.hp <= 0) { document.getElementById(`wolf-${wolf.id}`).style.display = 'none'; return; }
+                    const el = document.getElementById(`wolf-${wolf.id}`);
+                    el.style.display = 'flex';
+                    const angle = Math.atan2(player.y - wolf.y, player.x - wolf.x);
+                    wolf.x += Math.cos(angle) * WOLF_SPEED;
+                    wolf.y += Math.sin(angle) * WOLF_SPEED;
+                    el.style.left = wolf.x + 'px'; el.style.top = wolf.y + 'px';
 
-            // 4. Enemy Wolf Logic
-            if(gameState === 'chase' || gameState === 'battle') {
-                document.getElementById('wolfHPBar').style.display = 'block';
-
-                const angle = Math.atan2(player.y - wolf.y, player.x - wolf.x);
-                wolf.x += Math.cos(angle) * WOLF_SPEED;
-                wolf.y += Math.sin(angle) * WOLF_SPEED;
-                updateIcon('wolfIcon', wolf);
-                
-                // Player Collision (Game Over)
-                const dist = Math.hypot(player.x - wolf.x, player.y - wolf.y);
-                if(dist < 40) {
-                    if(gameState === 'chase') endGame(false, "Caught by the Beast!");
-                    // If in battle, this would trigger damage to player
-                }
-                
-                // 4.1 Companion Attack Logic
-                if(companion.active) {
-                    const compDist = Math.hypot(companion.x - wolf.x, companion.y - wolf.y);
-                    // Base damage is companion.level * 2
-                    const companionDamage = companion.level * 2; 
-
-                    if(compDist < 50) { 
-                        // Check for cooldown
-                        if(!wolf.isAttackedCooldown || Date.now() > wolf.isAttackedCooldown) {
-                            wolfHp -= companionDamage;
-                            msg(`Companion Wolf (Lvl ${companion.level}) attacked the Alpha Wolf for ${companionDamage} damage!`);
-                            
-                            // Visual feedback for attack
-                            const el = document.getElementById('friendlyWolfIcon');
-                            el.style.backgroundColor = '#ff00ff'; // Flash magenta
-                            setTimeout(() => el.style.backgroundColor = '#00bfff', 100);
-
-                            // Set cooldown (Attack every 1 second)
-                            wolf.isAttackedCooldown = Date.now() + 1000; 
-                            
-                            // Check if Alpha Wolf is defeated
-                            if (wolfHp <= 0) {
-                                endGame(true, "The Companion Wolf defeated the Alpha! You survived the night.");
-                            }
-                        }
+                    if (Math.hypot(player.x - wolf.x, player.y - wolf.y) < 35 && !player.invulnerable) {
+                        hp -= wolf.dmg; triggerHit(wolf.dmg);
+                        if (hp <= 0) triggerGameOver(false, "The Pack Overwhelmed You");
                     }
-                }
-                updateWolfHPBar();
+                });
             }
-
             updateHUD();
         }
 
-        function timerLoop() {
-            if(gameState !== 'collection') return;
-            timeLeft--;
-            if(timeLeft <= 0) {
-                gameState = 'chase';
-                wolf = { x: 50, y: 50, isAttackedCooldown: 0 }; // Initialize Wolf with cooldown
-                msg("THE ALPHA WOLF IS HERE! RUN!");
+        function handleCompanionAI() {
+            const livingWolves = wolves.filter(w => w.hp > 0);
+            const assignedTargets = new Set();
+
+            for (let i = companions.length - 1; i >= 0; i--) {
+                const dog = companions[i];
+                if (dog.hp <= 0) {
+                    const el = document.getElementById(`comp-${i}`);
+                    if (el) el.remove();
+                    companions.splice(i, 1);
+                    showAlert("A COMPANION HAS DIED!", "red");
+                    setTimeout(renderCompanions, 100);
+                    continue;
+                }
+
+                let target = null;
+                if (gameState === 'chase' && livingWolves.length > 0) {
+                    let bestWolf = null; let minDist = 9999;
+                    for (let w of livingWolves) {
+                        if (!assignedTargets.has(w.id)) {
+                            const d = Math.hypot(w.x - dog.x, w.y - dog.y);
+                            if (d < minDist) { minDist = d; bestWolf = w; }
+                        }
+                    }
+                    if (bestWolf) { target = bestWolf; assignedTargets.add(bestWolf.id); }
+                    else {
+                        minDist = 9999;
+                        for (let w of livingWolves) {
+                            const d = Math.hypot(w.x - dog.x, w.y - dog.y);
+                            if (d < minDist) { minDist = d; target = w; }
+                        }
+                    }
+                } else { target = player; }
+
+                const angle = Math.atan2(target.y - dog.y, target.x - dog.x);
+                const dist = Math.hypot(target.x - dog.x, target.y - dog.y);
+
+                if (target === player) {
+                    if (dist > 40) { dog.x += Math.cos(angle) * (DOG_SPEED + 1); dog.y += Math.sin(angle) * (DOG_SPEED + 1); }
+                } else {
+                    if (dist > 25) { dog.x += Math.cos(angle) * DOG_SPEED; dog.y += Math.sin(angle) * DOG_SPEED; }
+                    if (dist < 45) {
+                        if (Date.now() > (dog.cooldown || 0)) {
+                            target.hp -= dog.dmg;
+                            dog.cooldown = Date.now() + 800;
+                            dog.hp -= (target.dmg / 2);
+                            updateDogHP(i, dog);
+                            const wBar = document.getElementById(`wolf-hp-${target.id}`);
+                            if (wBar) wBar.style.width = (target.hp / target.maxHp * 100) + '%';
+                            if (target.hp <= 0) checkVictory();
+                        }
+                    }
+                }
+                updateIcon(`comp-${i}`, dog);
             }
         }
 
-        // --- ACTIONS ---
-        function checkChests() {
-            let found = false;
-            chests.forEach((c) => {
-                if(!c.opened && Math.hypot(player.x - c.x, player.y - c.y) < 50) {
-                    openChest(c);
-                    found = true;
+        function renderCompanions() {
+            const container = document.getElementById('companionsContainer');
+            container.innerHTML = '';
+            companions.forEach((c, i) => {
+                const el = document.createElement('div');
+                el.className = 'friendly-wolf'; el.id = `comp-${i}`;
+                el.innerHTML = `<div class="bar-container"><div class="bar-fill" id="dog-hp-${i}" style="width:${(c.hp / c.maxHp) * 100}%; background:#00ff00;"></div></div>🐕`;
+                container.appendChild(el);
+            });
+        }
+
+        function updateDogHP(index, dog) {
+            const bar = document.getElementById(`dog-hp-${index}`);
+            if (bar) bar.style.width = Math.max(0, (dog.hp / dog.maxHp) * 100) + '%';
+        }
+
+        function playerAttack() {
+            const fx = document.getElementById('fxLayer');
+            const ripple = document.createElement('div');
+            ripple.className = 'attack-range'; ripple.style.left = player.x + 'px'; ripple.style.top = player.y + 'px';
+            ripple.style.transform = 'translate(-50%, -50%)'; fx.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 300);
+
+            wolves.forEach(w => {
+                if (w.hp > 0 && Math.hypot(w.x - player.x, w.y - player.y) < 80) {
+                    w.hp -= dmg;
+                    const wBar = document.getElementById(`wolf-hp-${w.id}`);
+                    if (wBar) wBar.style.width = (w.hp / w.maxHp * 100) + '%';
+                    if (w.hp <= 0) checkVictory();
                 }
             });
-            if(!found) msg("No chest nearby. Press E to loot.");
         }
 
-        function openChest(c) {
-            c.opened = true;
-            drawChests();
-            
-            // Apply Immediate Stats
-            if(c.reward.type === 'hp') hp += c.reward.val;
-            if(c.reward.type === 'dmg') dmg += c.reward.val;
-            if(c.reward.type === 'bad') hp += c.reward.val;
-            if(c.reward.type === 'bad_dmg') dmg += c.reward.val;
+        function checkVictory() { if (wolves.every(w => w.hp <= 0)) triggerGameOver(true, "Area Cleared!"); }
 
-            // Add to Inventory
-            items.push(c.reward);
-            renderInventory();
-            msg(`Found: ${c.reward.name}`);
-
-            if(hp <= 0) endGame(false, "You died from a cursed chest.");
+        function triggerHit(val) {
+            player.invulnerable = true;
+            document.getElementById('playerIcon').classList.add('invulnerable');
+            showAlert(`TOOK ${val} DAMAGE!`, "red");
+            setTimeout(() => { player.invulnerable = false; document.getElementById('playerIcon').classList.remove('invulnerable'); }, 1000);
         }
 
-        function useItem(index) {
-            const item = items[index];
-            if(!item) {
-                 msg(`Slot ${index + 1} is empty.`);
-                 return;
+        function showAlert(text, color) {
+            const el = document.getElementById('topAlertBox');
+            el.innerText = text; el.style.borderColor = color; el.style.color = color; el.style.opacity = 1;
+            if (el.timeout) clearTimeout(el.timeout); el.timeout = setTimeout(() => el.style.opacity = 0, 2500);
+        }
+
+        function useItem(idx, isAuto = false, itemObj = null) {
+            const item = isAuto ? itemObj : items[idx];
+            if (!item) return;
+
+            if (item.type === 'potion') {
+                companions.push({ x: player.x, y: player.y, hp: 100, maxHp: 100, dmg: 15, level: 1, cooldown: 0 });
+                renderCompanions(); showAlert("SUMMONED COMPANION!", "#00ff00");
             }
+            else if (item.type === 'sword') { dmg += item.val; showAlert("DAMAGE INCREASED", "#00ff00"); }
+            else if (item.type === 'hp') { hp = Math.max(1, Math.min(maxHp, hp + item.val)); showAlert("HEALED", "#00ff00"); }
+            else if (item.type === 'shield') { maxHp += item.val; hp += item.val; showAlert("MAX HP UP", "#00ff00"); }
+            else if (item.type === 'curse_dmg') { dmg = Math.max(1, dmg + item.val); showAlert("CURSED: DMG DOWN", "red"); }
+            else if (item.type === 'hp_half') { hp = Math.floor(hp * item.val); showAlert("CURSED: HP HALVED", "red"); }
+            else if (item.type === 'hp_loss') { hp += item.val; showAlert("POISONED: HP LOST", "red"); }
 
-            if(item.type === 'potion') {
-                if(companion.active) {
-                    msg("The Summoning Potion is already used.");
-                    return;
-                }
-                summonCompanion();
-                msg("Companion Wolf Summoned! (Use ADAD to upgrade)");
-                // Remove the potion
-                items.splice(index, 1);
-                renderInventory();
-            } else {
-                msg(`Equipped/Used: ${item.name}`);
-            }
+            if (!isAuto) { items.splice(idx, 1); renderInventory(); }
+            if (hp <= 0) triggerGameOver(false, "Succumbed to Curses");
         }
 
-        function summonCompanion() {
-            companion.active = true;
-            companion.level = 1;
-            // Spawn near player
-            companion.x = player.x + 30;
-            companion.y = player.y;
-        }
-
-        function handleUpgradeCode(key) {
-            if(!companion.active) return;
-            
-            // Only track A and D
-            const k = key.toLowerCase();
-            if(k === 'a' || k === 'd') {
-                adadBuffer.push(k);
-                if(adadBuffer.length > 4) adadBuffer.shift(); // Keep last 4
-
-                // Check Pattern 'a','d','a','d'
-                if(adadBuffer.join('') === 'adad') {
-                    upgradeCompanion();
-                    adadBuffer = []; // Reset
-                }
-            }
-        }
-
-        function upgradeCompanion() {
-            companion.level++;
-            msg(`Companion Upgraded! Level ${companion.level}. Damage increased!`);
-            // Visual Effect
-            const el = document.getElementById('friendlyWolfIcon');
-            const newSize = 30 + (companion.level * 5);
-            el.style.width = newSize + 'px';
-            el.style.height = newSize + 'px';
-            el.style.backgroundColor = '#00ffff'; // Brighter blue
-            setTimeout(() => el.style.backgroundColor = '#00bfff', 200);
-        }
-
-        // --- UI ---
         function renderInventory() {
-            const list = document.getElementById('invList');
-            list.innerHTML = '';
+            const list = document.getElementById('invList'); list.innerHTML = '';
             items.forEach((item, i) => {
-                const row = document.createElement('div');
-                row.className = 'inv-item';
-                // Click to use
-                row.onclick = () => useItem(i);
-                
-                // Inventory Number Hint (i+1)
-                row.innerHTML = `
-                    <div class="key-hint">${i+1}</div>
-                    <span>${item.icon} ${item.name}</span>
-                `;
-                list.appendChild(row);
+                const div = document.createElement('div');
+                div.className = 'inv-item'; div.onclick = () => useItem(i);
+                div.innerHTML = `<span class="key-hint">${i + 1}</span> <div>${item.icon} ${item.name}</div>`;
+                list.appendChild(div);
             });
         }
 
-        function toggleInventory() {
-            const p = document.getElementById('inventoryPanel');
-            // Toggle the 'visible' class
-            p.classList.toggle('visible'); 
+        function toggleDogStats() {
+            const modal = document.getElementById('dogStatsModal');
+            if (modal.style.display === 'block') { modal.style.display = 'none'; return; }
+            const content = document.getElementById('dogStatsContent');
+            content.innerHTML = '';
+            if (companions.length === 0) content.innerHTML = '<p style="text-align:center">No living companions.</p>';
+            else {
+                companions.forEach((dog, i) => {
+                    const row = document.createElement('div'); row.className = 'dog-stat-row';
+                    row.innerHTML = `<span style="color:#00ff00;">Dog ${i + 1}</span><span>Lvl: ${dog.level}</span><span>HP: ${Math.floor(dog.hp)}/${dog.maxHp}</span><span>DMG: ${dog.dmg}</span>`;
+                    content.appendChild(row);
+                });
+            }
+            modal.style.display = 'block';
         }
 
-        function updateHUD() {
-            document.getElementById('hpDisplay').innerText = hp;
-            document.getElementById('dmgDisplay').innerText = dmg;
-            document.getElementById('timeDisplay').innerText = formatTime(timeLeft);
+        function tryLoot() {
+            let found = false;
+            chests.forEach((c, i) => {
+                if (!c.opened && Math.hypot(player.x - c.x, player.y - c.y) < 50) {
+                    c.opened = true; document.getElementById(`chest-${i}`).remove(); found = true;
+                    if (c.reward.type.includes('curse') || c.reward.type.includes('hp_loss') || c.reward.type.includes('hp_half')) {
+                        useItem(0, true, c.reward);
+                    } else {
+                        items.push(c.reward); renderInventory(); showAlert(`LOOTED: ${c.reward.name}`, "#ffff00");
+                    }
+                }
+            });
+            if (!found) showAlert("No chest nearby", "#555");
         }
 
-        function updateWolfHPBar() {
-            const percentage = Math.max(0, (wolfHp / MAX_WOLF_HP) * 100);
-            document.getElementById('wolfHPCurrent').style.width = percentage + '%';
-        }
+        function toggleInventory() { document.getElementById('inventoryPanel').classList.toggle('visible'); }
 
-        function formatTime(totalSeconds) {
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
-            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
-
-        function updateIcon(id, obj) {
-            const el = document.getElementById(id);
-            el.style.left = obj.x + 'px';
-            el.style.top = obj.y + 'px';
-        }
-
-        function msg(text) {
-            document.getElementById('storyText').innerText = text;
-        }
-
-        function endGame(win, reason) {
-            gameState = 'over';
-            document.getElementById('gameOverOverlay').style.display = 'flex';
-            document.getElementById('endTitle').innerText = win ? "VICTORY" : "GAME OVER";
-            document.getElementById('endReason').innerText = reason;
-        }
-
-        // --- INPUT HANDLERS ---
+        // --- CONTROLS + ADMIN LOGIC ---
         function handleDown(e) {
             const k = e.key.toLowerCase();
-            
-            // Map arrow keys to WASD
-            let mappedKey = k;
-            if (k === 'arrowup') mappedKey = 'w';
-            if (k === 'arrowdown') mappedKey = 's';
-            if (k === 'arrowleft') mappedKey = 'a';
-            if (k === 'arrowright') mappedKey = 'd';
 
-            const isMoveKey = ['w','a','s','d'].includes(mappedKey);
-            
-            if(isMoveKey) {
-                keyStates[mappedKey] = true;
-                handleUpgradeCode(k); // Check for ADAD using the original key
-            }
-            if(k === 'e') keyStates['e'] = true;
-            
-            // Inventory Toggle
-            if(k === 'q' || k === 'alt') {
-                e.preventDefault();
-                toggleInventory();
+            // ADMIN SHORTCUT (CTRL + SHIFT + A)
+            if (e.ctrlKey && e.shiftKey && k === 'a') {
+                document.getElementById('adminPanel').style.display = 'block';
+                // Pre-fill values
+                document.getElementById('admDay').value = currentLevel;
+                document.getElementById('admHp').value = Math.floor(hp);
+                document.getElementById('admDmg').value = dmg;
+                document.getElementById('admSpeed').value = PLAYER_SPEED;
+                return;
             }
 
-            // Inventory Use (1-9)
-            if(k >= '1' && k <= '9') {
-                // Ensure key is treated as number index (1 -> index 0)
-                useItem(parseInt(k)-1);
+            if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+                let key = k;
+                if (k === 'arrowup') key = 'w'; if (k === 'arrowdown') key = 's';
+                if (k === 'arrowleft') key = 'a'; if (k === 'arrowright') key = 'd';
+                keyStates[key] = true;
             }
+            if (k === 'e') tryLoot();
+            if (k === ' ') playerAttack();
+            if (k === 'q' || k === 'alt') toggleInventory();
+            if (k === 'o') toggleDogStats();
+            if (k >= '1' && k <= '9') useItem(parseInt(k) - 1);
         }
 
         function handleUp(e) {
             const k = e.key.toLowerCase();
-            // Map arrow keys to WASD for keyUp
-            let mappedKey = k;
-            if (k === 'arrowup') mappedKey = 'w';
-            if (k === 'arrowdown') mappedKey = 's';
-            if (k === 'arrowleft') mappedKey = 'a';
-            if (k === 'arrowright') mappedKey = 'd';
-
-            if(['w','a','s','d'].includes(mappedKey)) keyStates[mappedKey] = false;
+            let key = k;
+            if (k === 'arrowup') key = 'w'; if (k === 'arrowdown') key = 's';
+            if (k === 'arrowleft') key = 'a'; if (k === 'arrowright') key = 'd';
+            keyStates[key] = false;
         }
+
+        // --- ADMIN FUNCTIONS ---
+        function applyAdminSettings() {
+            currentLevel = parseInt(document.getElementById('admDay').value);
+            hp = parseInt(document.getElementById('admHp').value);
+            maxHp = Math.max(maxHp, hp); // Ensure maxHP can hold it
+            dmg = parseInt(document.getElementById('admDmg').value);
+            PLAYER_SPEED = parseInt(document.getElementById('admSpeed').value);
+
+            updateHUD();
+            document.getElementById('adminPanel').style.display = 'none';
+            showAlert("ADMIN SETTINGS APPLIED", "#00ff00");
+
+            // Visual Indicator of Admin Power
+            document.getElementById('playerIcon').style.border = "3px solid #00ff00";
+        }
+        function closeAdmin() { document.getElementById('adminPanel').style.display = 'none'; }
+
+        function timerLoop() {
+            if (gameState !== 'collection') return;
+            timeLeft--;
+            if (timeLeft <= 0) {
+                gameState = 'chase';
+                showAlert("THE PACK ARRIVES!", "red");
+                msg("HUNT OR BE HUNTED!");
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('hpDisplay').innerText = Math.floor(hp) + '/' + maxHp;
+            document.getElementById('dmgDisplay').innerText = dmg;
+            document.getElementById('levelDisplay').innerText = currentLevel;
+            document.getElementById('timeDisplay').innerText = gameState === 'collection' ? timeLeft + 's' : 'HUNT';
+        }
+
+        function updateIcon(id, obj) {
+            const el = document.getElementById(id);
+            if (el) { el.style.left = obj.x + 'px'; el.style.top = obj.y + 'px'; }
+        }
+
+        function msg(txt) {
+            const t = document.getElementById('storyText'); t.innerText = txt; t.style.opacity = 1;
+            setTimeout(() => t.style.opacity = 0, 3000);
+        }
+
+        function triggerGameOver(win, reason) {
+            gameState = 'over';
+
+            // SAVE HIGH SCORE LOGIC
+            const daysSurvived = currentLevel;
+            const myUser = localStorage.getItem('gameUsername') || "Unknown";
+            const currentHigh = parseInt(localStorage.getItem('feral_highScore') || "0");
+
+            // Update Text
+            const survivalText = document.getElementById('daysSurvivedText');
+            if (win) {
+                survivalText.innerText = "Current Day Completed!";
+            } else {
+                survivalText.innerText = `YOU SURVIVED ${daysSurvived} DAYS`;
+
+                // Save if record broken
+                if (daysSurvived > currentHigh) {
+                    localStorage.setItem('feral_highScore', daysSurvived);
+                    localStorage.setItem('feral_bestPlayer', myUser);
+                    survivalText.innerText += " (NEW RECORD!)";
+                }
+            }
+
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+            document.getElementById('endTitle').innerText = win ? "VICTORY" : "DEFEAT";
+            document.getElementById('endReason').innerText = reason;
+            document.getElementById(win ? 'winButtons' : 'lossButtons').style.display = 'block';
+        }
+
+        function nextLevel() { startLevel(currentLevel + 1); }
 
         init();
     </script>
 </body>
+
 </html>

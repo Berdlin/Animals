@@ -1,24 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Feral Pursuit - Multiplayer</title>
     <style>
-        /* --- CORE VISUALS --- */
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            background-color: #080808; 
-            color: #ccc; 
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #080808;
+            color: #ccc;
             margin: 0;
             height: 100vh;
-            overflow: hidden; /* NO SCROLLING ON PAGE */
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
+            touch-action: none;
         }
 
-        /* --- LAYOUT --- */
         .game-wrapper {
             display: flex;
             width: 100%;
@@ -26,7 +26,6 @@
             position: relative;
         }
 
-        /* MAP AREA (Full Screen Feel) */
         .game-stage {
             flex-grow: 1;
             position: relative;
@@ -44,29 +43,26 @@
             border: 2px solid #333;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
         }
 
-        /* --- INVENTORY SIDEBAR (Toggleable) --- */
         .inventory-sidebar {
             width: 280px;
             background-color: #111;
-            border-right: 2px solid #333; /* Border on the right edge */
+            border-right: 2px solid #333;
             height: 100vh;
             position: absolute;
-            left: 0; /* Positioned on the left */
-            right: auto;
+            left: 0;
             top: 0;
-            transform: translateX(-100%); /* Start hidden off the left */
+            transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
             z-index: 100;
             display: flex;
             flex-direction: column;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.5); /* Shadow on the right */
         }
 
         .inventory-sidebar.visible {
-            transform: translateX(0); /* Slide in to be visible */
+            transform: translateX(0);
         }
 
         .inv-header {
@@ -81,14 +77,9 @@
 
         .inv-list {
             flex-grow: 1;
-            overflow-y: auto; /* SCROLLABLE INVENTORY */
+            overflow-y: auto;
             padding: 10px;
         }
-        
-        /* Custom Scrollbar for Inventory */
-        .inv-list::-webkit-scrollbar { width: 8px; }
-        .inv-list::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-        .inv-list::-webkit-scrollbar-track { background: #000; }
 
         .inv-item {
             background: #222;
@@ -99,515 +90,448 @@
             display: flex;
             align-items: center;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        .inv-item:hover { background: #2a2a2a; border-color: #555; }
-        .inv-item.active { border-color: #ff4500; background: #2a1414; }
 
         .key-hint {
-            background: #ff4500; color: #000; font-weight: bold;
-            width: 20px; height: 20px; border-radius: 3px;
-            display: flex; justify-content: center; align-items: center;
-            margin-right: 10px; font-size: 0.8em;
+            background: #ff4500;
+            color: #000;
+            font-weight: bold;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 10px;
+            font-size: 0.8em;
         }
 
-        /* --- HUD ELEMENTS --- */
         .hud-top {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 40px; z-index: 50;
-            background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 30px;
-            border: 1px solid #333; pointer-events: none;
-        }
-        .hud-stat { font-size: 1.2em; color: #fff; }
-        .hud-stat span { color: #ff4500; font-weight: bold; }
-        
-        /* Alpha Wolf HP Bar */
-        #wolfHPBar {
-            position: absolute; top: 5px; width: 100%; height: 5px; 
-            background: #444; overflow: hidden; display: none;
-        }
-        #wolfHPCurrent {
-            height: 100%; background: red; transition: width 0.2s;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 40px;
+            z-index: 50;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 30px;
+            border-radius: 30px;
+            border: 1px solid #333;
+            pointer-events: none;
         }
 
-        /* --- GAME ENTITIES --- */
-        /* Smooth transition for movement */
-        .icon { position: absolute; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; transition: all 0.05s linear; }
-        
-        /* Player Icon for the local client */
-        .playerIconSelf { font-size: 2em; width: 40px; height: 40px; background: #ff4500; border-radius: 50%; border: 2px solid #fff; z-index: 10; opacity: 1;}
-        
-        /* Player Icon for other clients */
-        .playerIconOther { font-size: 2em; width: 40px; height: 40px; background: #00bfff; border-radius: 50%; border: 2px solid #fff; z-index: 10; opacity: 0.7; }
-        
-        /* Player Name Tag (New) */
-        .nameTag { position: absolute; top: -20px; font-size: 0.7em; color: white; background: rgba(0,0,0,0.5); padding: 2px 5px; border-radius: 3px; white-space: nowrap; }
-
-        #wolfIcon { 
-            font-size: 2.5em; width: 50px; height: 50px; background: #500; border-radius: 50%; border: 2px solid #f00; z-index: 9; 
-            position: relative; 
+        .hud-stat {
+            font-size: 1.2em;
+            color: #fff;
         }
 
-        .friendlyWolfIcon {
-            font-size: 1.5em; width: 30px; height: 30px; 
-            background: #00bfff; border-radius: 50%; border: 2px solid #fff; 
+        .hud-stat span {
+            color: #ff4500;
+            font-weight: bold;
+        }
+
+        .icon {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.05s linear;
+        }
+
+        .playerIconSelf {
+            font-size: 2em;
+            width: 40px;
+            height: 40px;
+            background: #ff4500;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 10;
+        }
+
+        .playerIconOther {
+            font-size: 2em;
+            width: 40px;
+            height: 40px;
+            background: #00bfff;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 10;
+            opacity: 0.7;
+        }
+
+        .nameTag {
+            position: absolute;
+            top: -20px;
+            font-size: 0.7em;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2px 5px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+
+        #wolfIcon {
+            font-size: 2.5em;
+            width: 50px;
+            height: 50px;
+            background: #500;
+            border-radius: 50%;
+            border: 2px solid #f00;
             z-index: 9;
         }
 
-        .chest { font-size: 1.8em; z-index: 8; cursor: pointer; }
-        .chest-bad::after { content: ''; position: absolute; top: 0; right: 0; width: 8px; height: 8px; background: red; border-radius: 50%; }
-
-        /* Story Overlay */
-        #storyText {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-style: italic;
-            color: #fff;
-            max-width: 80%;
-            text-align: center;
-            transition: opacity 0.5s;
-            z-index: 50;
+        .friendlyWolfIcon {
+            font-size: 1.5em;
+            width: 30px;
+            height: 30px;
+            background: #00bfff;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            z-index: 9;
         }
-        
-        /* Game Over Overlay */
+
+        .chest {
+            font-size: 1.8em;
+            z-index: 8;
+            cursor: pointer;
+        }
+
+        .chest-bad::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            background: red;
+            border-radius: 50%;
+        }
+
+        #storyText {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            width: 250px;
+            text-align: left;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 40;
+            transition: opacity 0.5s;
+            color: #ff4500;
+            border: 1px solid #ff4500;
+            pointer-events: none;
+        }
+
         #gameOverOverlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(0, 0, 0, 0.9);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 200;
             display: none;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            flex-direction: column;
-            z-index: 1000;
-        }
-        .restart-btn {
-            background-color: #ff4500;
-            color: #000;
-            font-family: 'Cinzel', serif;
-            font-weight: bold;
-            padding: 15px 30px;
-            margin-top: 30px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            font-size: 1.2em;
         }
 
+        .mobile-controls-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .mobile-controls-layer {
+                display: block;
+            }
+
+            #mapViewport {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
+        }
+
+        #joystickZone {
+            position: absolute;
+            bottom: 50px;
+            left: 40px;
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            pointer-events: auto;
+        }
+
+        #joystickKnob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 69, 0, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .action-btn-group {
+            position: absolute;
+            bottom: 40px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            pointer-events: auto;
+        }
+
+        .mob-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(50, 50, 50, 0.9);
+            border: 2px solid #fff;
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.2em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mob-btn:active {
+            background: #ff4500;
+        }
+
+        #btnAttack {
+            width: 90px;
+            height: 90px;
+            background: rgba(200, 0, 0, 0.7);
+            border-color: #ff4500;
+            font-size: 2em;
+        }
+
+        #btnLoot {
+            background: rgba(0, 191, 255, 0.7);
+            border-color: #00bfff;
+            font-size: 1.5em;
+        }
+
+        .small-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        #btnInventory {
+            width: 50px;
+            height: 50px;
+            font-size: 0.8em;
+            background: #333;
+        }
     </style>
 </head>
+
 <body>
-    <div id="inventorySidebar" class="inventory-sidebar">
-        <div class="inv-header">Inventory (Q/Alt to Close)</div>
-        <div id="invList" class="inv-list">
-            <p style="text-align: center; color: #777;">Inventory is empty. Loot chests (E)!</p>
-        </div>
-        <div id="companionInfo" class="inv-header" style="border-top: 1px solid #333; font-size: 0.9em; background-color: #222;">
-            Companion: Inactive
-        </div>
+    <div class="inventory-sidebar" id="inventory-sidebar">
+        <div class="inv-header">INVENTORY (Q/Alt)</div>
+        <div class="inv-list" id="invList"></div>
     </div>
-    
+
     <div class="hud-top">
-        <div class="hud-stat">TIME: <span id="timeStat">60</span>s</div>
-        <div class="hud-stat">HP: <span id="hpStat">10</span></div>
-        <div class="hud-stat">DMG: <span id="dmgStat">1</span></div>
+        <div class="hud-stat">TIME: <span id="timeStat">...</span></div>
+        <div class="hud-stat">HP: <span id="hpStat">...</span></div>
+        <div class="hud-stat">DMG: <span id="dmgStat">...</span></div>
     </div>
 
     <div class="game-wrapper">
         <div class="game-stage">
             <div id="mapViewport">
-                <div id="wolfHPBar"><div id="wolfHPCurrent" style="width: 100%;"></div></div>
-                <div id="wolfIcon" class="icon" style="display:none;"> 🐺 </div>
-                
-                <div id="playersLayer"></div> 
-                
-                <div id="mapItems"></div> 
-                
-                <div id="effectsLayer"></div> 
+                <div id="wolfIcon" class="icon" style="display:none;">🐺</div>
+                <div id="playersLayer"></div>
+                <div id="mapItems"></div>
+                <div id="effectsLayer"></div>
             </div>
-            <div id="storyText" style="opacity: 1;"> Connected to server. Waiting for host to start game... </div>
+            <div id="storyText" style="opacity: 1;">Connecting...</div>
+
+            <div class="mobile-controls-layer">
+                <div id="joystickZone">
+                    <div id="joystickKnob"></div>
+                </div>
+                <div class="action-btn-group">
+                    <div class="small-btn-group">
+                        <div class="mob-btn" id="btnInventory" ontouchstart="toggleInventory()">INV</div>
+                    </div>
+                    <div class="mob-btn" id="btnLoot" ontouchstart="triggerAction('loot')">👋</div>
+                    <div class="mob-btn" id="btnAttack" ontouchstart="triggerAction('attack')">⚔️</div>
+                </div>
+            </div>
         </div>
     </div>
-    
-    <div id="gameOverOverlay">
+
+    <div id="gameOverOverlay" style="display: none;">
         <h1 id="endTitle" style="color:white; font-size:3em;">GAME OVER</h1>
         <p id="endReason" style="color:#aaa; font-size:1.5em;"></p>
-        <a href="gameintro.html" class="restart-btn">Return to Intro</a>
+        <a href="gameintro.html" style="color:#ff4500; font-size:1.2em; margin-top:20px;">Return to Intro</a>
     </div>
-    
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // --- CONFIG & STATE ---
-        const MAP_SIZE = 600;
-        let currentGameState = null;
         let myId = null;
         let keyStates = {};
-        let adadBuffer = []; // For companion upgrade combo
         let gameActive = false;
-        let initialMessageCleared = false; // <-- FIX: Flag to ensure the initial waiting message is only cleared once
-        
-        // --- SOCKET.IO CONNECTION & STATE MANAGEMENT ---
+        let initialMessageCleared = false;
+        let joyActive = false;
+        let joyData = { x: 0, y: 0 };
+        const joyBase = document.getElementById('joystickZone');
+        const joyKnob = document.getElementById('joystickKnob');
         const socket = io();
+        const getEl = (id) => document.getElementById(id);
+
         socket.on('connect', () => {
             myId = socket.id;
-            // Basic check to ensure we have context
             const roomCode = localStorage.getItem('gameRoomCode');
-            const username = localStorage.getItem('gameUsername');
-            if (!roomCode || !username) {
-                msg("Game session invalid. Returning to intro.");
-                setTimeout(() => window.location.href = 'gameintro.html', 3000);
-                return;
-            }
-            console.log("Connected. My ID:", myId);
+            if (roomCode) { console.log(`Connected. Room: ${roomCode}`); }
+            else { window.location.href = 'gameintro.html'; }
         });
 
-        socket.on('hostLeft', (message) => {
-            endGame(false, message);
-        });
-
-        // The authoritative game state update from the server
         socket.on('gameStateUpdate', (state) => {
-            if (state.status === 'lobby') return;
-            
-            // --- FIX: Clear the initial waiting message on the very first update ---
-            if (!initialMessageCleared) {
-                msg(""); // Clear the "waiting" message
-                initialMessageCleared = true;
+            if (state.status !== 'lobby' && state.status !== 'over' && !initialMessageCleared) {
+                getEl('storyText').style.opacity = '0'; initialMessageCleared = true; gameActive = true;
             }
-            // -----------------------------------------------------------------------
-
-            currentGameState = state;
-            gameActive = true;
+            if (state.status !== 'over' && state.status !== 'lobby') gameActive = true;
             renderGameState(state);
-            
-            // Check for game over state immediately
-            if (state.status === 'over' && getEl('gameOverOverlay').style.display !== 'flex') {
-                endGame(state.wolf && state.wolf.hp <= 0, state.endReason);
-            }
+            if (state.status === 'over') endGame(state.players[myId]?.alive, state.endReason);
         });
 
-        // =======================================================
-        // UTILITY FUNCTIONS
-        // =======================================================
+        socket.on('hostLeft', (message) => endGame(false, message));
 
-        const distance = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
-        
-        function getEl(id) { return document.getElementById(id); }
+        function sendActionToServer(type, data = {}) { if (gameActive) socket.emit('playerAction', { type, data }); }
 
-        function updateIcon(el, obj) {
-            el.style.left = obj.x + 'px';
-            el.style.top = obj.y + 'px';
-        }
-        
-        function msg(text) {
-            const storyTextEl = getEl('storyText');
-            if (storyTextEl) {
-                storyTextEl.innerText = text;
-                // Fade out/hide the message element if text is empty
-                storyTextEl.style.opacity = text ? '1' : '0';
-            }
-        }
-
-        function toggleInventory() {
-            const inv = getEl('inventorySidebar');
-            inv.classList.toggle('visible');
-        }
-
-        function endGame(win, reason) {
-            // Prevent multiple calls
-            const overlay = getEl('gameOverOverlay');
-            if(overlay.style.display !== 'none') return; 
-
-            overlay.style.display = 'flex';
-            getEl('endTitle').textContent = win ? "VICTORY!" : "DEFEAT";
-            getEl('endReason').textContent = reason;
-            
-            // Disable further input
-            keyStates = {}; 
-            window.removeEventListener('keydown', handleDown);
-            window.removeEventListener('keyup', handleUp);
-        }
-
-        // =======================================================
-        // RENDERING LOGIC (Reads from currentGameState)
-        // =======================================================
-
-        function renderGameState(state) {
-            const myPlayer = state.players[myId];
-            if (!myPlayer) {
-                const reason = state.endReason || "You have been defeated or disconnected.";
-                if (state.status !== 'over') {
-                    endGame(false, reason);
-                }
-                return;
-            }
-
-            // 1. Update HUD
-            getEl('timeStat').textContent = state.timer > 0 ? state.timer : 'FIGHT!';
-            getEl('hpStat').textContent = myPlayer.alive ? myPlayer.hp : '0 (DEFEATED)';
-            getEl('dmgStat').textContent = myPlayer.dmg;
-
-            // 2. Render Entities
-            renderPlayers(state.players);
-            renderWolf(state.wolf, state.status);
-            renderChests(state.chests);
-            
-            // 3. Render Inventory (Local player only)
-            renderInventory(myPlayer);
-
-            // 4. Update Message (Only if the server sent a specific message)
-            if(state.message) {
-                msg(state.message);
-            }
-        }
-
-        function renderPlayers(players) {
-            const playersLayer = getEl('playersLayer');
-            const activeIds = new Set();
-            
-            for (const id in players) {
-                const p = players[id];
-                activeIds.add(id);
-
-                let playerEl = getEl('player-' + id);
-                let nameTagEl = getEl('nameTag-' + id);
-
-                if (!playerEl) {
-                    playerEl = document.createElement('div');
-                    playerEl.id = 'player-' + id;
-                    playerEl.className = 'icon ' + (id === myId ? 'playerIconSelf' : 'playerIconOther');
-                    playerEl.innerText = p.alive ? '👤' : '💀';
-                    playersLayer.appendChild(playerEl);
-
-                    nameTagEl = document.createElement('div');
-                    nameTagEl.id = 'nameTag-' + id;
-                    nameTagEl.className = 'nameTag';
-                    playerEl.appendChild(nameTagEl);
-                }
-                
-                playerEl.innerText = p.alive ? '👤' : '💀';
-                playerEl.style.opacity = p.alive ? '1' : '0.3';
-                
-                nameTagEl.textContent = `${p.username} (${p.hp} HP)`;
-
-                updateIcon(playerEl, p); 
-
-                renderCompanion(p);
-            }
-
-            Array.from(playersLayer.children).forEach(el => {
-                const idParts = el.id.split('-');
-                const type = idParts[0];
-                const idPart = idParts[1];
-                
-                if ((type === 'player' || type === 'companion') && !activeIds.has(idPart)) {
-                    el.remove();
-                }
-            });
-        }
-        
-        function renderCompanion(player) {
-            const playersLayer = getEl('playersLayer');
-            const id = player.id;
-            let companionEl = getEl('companion-' + id);
-
-            if (player.companion.active) {
-                if (!companionEl) {
-                    companionEl = document.createElement('div');
-                    companionEl.id = 'companion-' + id;
-                    companionEl.className = 'icon friendlyWolfIcon';
-                    companionEl.innerText = '🐕';
-                    playersLayer.appendChild(companionEl);
-                }
-                updateIcon(companionEl, player.companion);
-                const newSize = 30 + (player.companion.level * 5);
-                companionEl.style.width = newSize + 'px';
-                companionEl.style.height = newSize + 'px';
-            } else if (companionEl) {
-                companionEl.remove();
-            }
-        }
-
-        function renderWolf(wolf, status) {
-            const wolfIcon = getEl('wolfIcon');
-            const wolfHPBar = getEl('wolfHPBar');
-
-            if (status === 'chase' || status === 'battle') {
-                updateIcon(wolfIcon, wolf);
-                wolfIcon.style.display = 'flex';
-                wolfHPBar.style.display = 'block';
-
-                const hpPercent = (wolf.hp / wolf.maxHp) * 100;
-                getEl('wolfHPCurrent').style.width = Math.max(0, hpPercent) + '%';
-                
-                if (wolf.hp <= 0) {
-                    wolfIcon.style.display = 'none';
-                    wolfHPBar.style.display = 'none';
-                }
-            } else {
-                wolfIcon.style.display = 'none';
-                wolfHPBar.style.display = 'none';
-            }
-        }
-
-        function renderChests(chests) {
-            const container = getEl('mapItems');
-            container.innerHTML = '';
-
-            chests.forEach((c, index) => {
-                if(c.opened) return;
-                const el = document.createElement('div');
-                el.className = 'icon chest';
-                el.id = 'chest-' + index;
-                el.textContent = '📦';
-                el.style.left = c.x + 'px';
-                el.style.top = c.y + 'px';
-                
-                if (c.reward.type && c.reward.type.includes('bad')) {
-                    el.classList.add('chest-bad');
-                }
-                
-                el.onclick = () => sendActionToServer('loot');
-
-                container.appendChild(el);
-            });
-        }
-        
-        function renderInventory(player) {
-            const list = getEl('invList');
-            const companionInfo = getEl('companionInfo');
-            
-            list.innerHTML = '';
-            
-            if (player.inventory.length === 0) {
-                list.innerHTML = '<p style="text-align: center; color: #777;">Inventory is empty. Loot chests (E)!</p>';
-            } else {
-                player.inventory.forEach((item, index) => {
-                    const li = document.createElement('div');
-                    li.className = 'inv-item';
-                    const icon = item.icon || '❓';
-                    const name = item.name || 'Unknown Item';
-                    li.innerHTML = `<span class="key-hint">${index + 1}</span> <span>${icon} ${name}</span>`;
-                    li.onclick = () => sendActionToServer('useItem', { index: index });
-                    list.appendChild(li);
-                });
-            }
-
-            if (player.companion.active) {
-                const upgradeBtn = `<button onclick="sendActionToServer('upgradeCompanion')" style="margin-left: 10px; padding: 5px 10px; background: #ff4500; border: none; border-radius: 3px; cursor: pointer;">Upgrade (ADAD)</button>`;
-                companionInfo.innerHTML = `Companion: Level ${player.companion.level} ${upgradeBtn}`;
-            } else {
-                companionInfo.innerHTML = 'Companion: Inactive';
-            }
-        }
-        
-        // =======================================================
-        // INPUT & SERVER COMMUNICATION
-        // =======================================================
-
-        function sendActionToServer(type, data = {}) {
-            if (!myId || !currentGameState || currentGameState.status === 'over') return;
-            const myPlayer = currentGameState.players[myId];
-            if (!myPlayer || !myPlayer.alive) return;
-            
-            const action = { type, data };
-            socket.emit('playerAction', action);
-        }
-
-        function handleUpgradeCode(key) {
-            const target = ['a', 'd', 'a', 'd'];
-            
-            let mappedKey = key.toLowerCase();
-            if (mappedKey === 'arrowleft') mappedKey = 'a';
-            if (mappedKey === 'arrowright') mappedKey = 'd';
-
-            if (mappedKey === 'a' || mappedKey === 'd') {
-                adadBuffer.push(mappedKey);
-                if (adadBuffer.length > 4) {
-                    adadBuffer.shift();
-                }
-
-                if (adadBuffer.length === 4 && adadBuffer.every((val, index) => val === target[index])) {
-                    sendActionToServer('upgradeCompanion');
-                    adadBuffer = [];
-                }
-            } else {
-                adadBuffer = [];
-            }
-        }
-
-        let moveActionSent = false;
         function checkAndSendMovement() {
-            if (!gameActive || currentGameState.status === 'over') return;
-            
-            let dx=0, dy=0;
-            if(keyStates['w']) dy--;
-            if(keyStates['s']) dy++;
-            if(keyStates['a']) dx--;
-            if(keyStates['d']) dx++;
-            
-            const isMoving = (dx !== 0 || dy !== 0);
-
-            if (isMoving) {
-                sendActionToServer('move', { dx, dy });
-                moveActionSent = true;
-            } else if (moveActionSent) {
-                sendActionToServer('stopMove');
-                moveActionSent = false;
-            }
+            if (!gameActive) return;
+            let dx = 0, dy = 0;
+            if (keyStates['w']) dy--; if (keyStates['s']) dy++;
+            if (keyStates['a']) dx--; if (keyStates['d']) dx++;
+            if (joyActive) { dx = joyData.x; dy = joyData.y; }
+            if (dx || dy) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) sendActionToServer('move', { dx: dx / len, dy: dy / len });
+            } else { sendActionToServer('stopMove'); }
         }
-        
         setInterval(checkAndSendMovement, 50);
 
         function handleDown(e) {
             const k = e.key.toLowerCase();
-            
-            let mappedKey = k;
-            if (k === 'arrowup') mappedKey = 'w';
-            if (k === 'arrowdown') mappedKey = 's';
-            if (k === 'arrowleft') mappedKey = 'a';
-            if (k === 'arrowright') mappedKey = 'd';
-
-            const isMoveKey = ['w','a','s','d'].includes(mappedKey);
-            
-            if(isMoveKey && !keyStates[mappedKey]) { 
-                keyStates[mappedKey] = true;
-                handleUpgradeCode(k); 
-            }
-
-            if(k === 'e' && !keyStates['e']) {
-                keyStates['e'] = true;
-                sendActionToServer('loot');
-            }
-            
-            if(k === 'q' || k === 'alt') {
-                e.preventDefault();
-                toggleInventory();
-            }
-
-            if(k >= '1' && k <= '9') {
-                sendActionToServer('useItem', { index: parseInt(k) - 1 });
-            }
+            let key = k;
+            if (k === 'arrowup') key = 'w'; if (k === 'arrowdown') key = 's';
+            if (k === 'arrowleft') key = 'a'; if (k === 'arrowright') key = 'd';
+            if (['w', 'a', 's', 'd'].includes(key)) keyStates[key] = true;
+            if (k === 'e') sendActionToServer('loot');
+            if (k === 'q' || k === 'alt') toggleInventory();
+            if (k >= '1' && k <= '9') sendActionToServer('useItem', { index: parseInt(k) - 1 });
         }
 
         function handleUp(e) {
             const k = e.key.toLowerCase();
-            let mappedKey = k;
-            if (k === 'arrowup') mappedKey = 'w';
-            if (k === 'arrowdown') mappedKey = 's';
-            if (k === 'arrowleft') mappedKey = 'a';
-            if (k === 'arrowright') mappedKey = 'd';
-
-            if(['w','a','s','d'].includes(mappedKey)) keyStates[mappedKey] = false;
-            if(k === 'e') keyStates['e'] = false;
+            let key = k;
+            if (k === 'arrowup') key = 'w'; if (k === 'arrowdown') key = 's';
+            if (k === 'arrowleft') key = 'a'; if (k === 'arrowright') key = 'd';
+            if (['w', 'a', 's', 'd'].includes(key)) keyStates[key] = false;
         }
 
-        // --- INIT ---
         window.addEventListener('keydown', handleDown);
         window.addEventListener('keyup', handleUp);
 
+        joyBase.addEventListener('touchstart', (e) => { joyActive = true; updateJoy(e.touches[0]); }, { passive: false });
+        joyBase.addEventListener('touchmove', (e) => { if (joyActive) { e.preventDefault(); updateJoy(e.touches[0]); } }, { passive: false });
+        joyBase.addEventListener('touchend', () => { joyActive = false; joyData = { x: 0, y: 0 }; joyKnob.style.transform = `translate(-50%,-50%)`; });
+
+        function updateJoy(touch) {
+            const rect = joyBase.getBoundingClientRect();
+            let dx = touch.clientX - (rect.left + rect.width / 2);
+            let dy = touch.clientY - (rect.top + rect.height / 2);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = rect.width / 2;
+            if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
+            joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            joyData.x = dx / maxDist; joyData.y = dy / maxDist;
+        }
+
+        function triggerAction(act) { if (act === 'loot') sendActionToServer('loot'); }
+
+        function renderGameState(state) {
+            const myPlayer = state.players[myId];
+            if (myPlayer) {
+                getEl('timeStat').textContent = state.timer > 0 ? state.timer : 'FIGHT';
+                getEl('hpStat').textContent = myPlayer.alive ? myPlayer.hp : 'DEAD';
+                getEl('dmgStat').textContent = myPlayer.dmg;
+                renderInventory(myPlayer);
+            }
+            renderPlayers(state.players);
+            const wolf = getEl('wolfIcon');
+            if ((state.status === 'chase' || state.status === 'battle') && state.wolf && state.wolf.hp > 0) {
+                wolf.style.display = 'flex'; wolf.style.left = state.wolf.x + 'px'; wolf.style.top = state.wolf.y + 'px';
+            } else { wolf.style.display = 'none'; }
+            const chestCont = getEl('mapItems'); chestCont.innerHTML = '';
+            state.chests.forEach((c, i) => {
+                if (c.opened) return;
+                const el = document.createElement('div'); el.className = 'icon chest';
+                if (c.reward.type.includes('bad')) el.classList.add('chest-bad');
+                el.textContent = '📦'; el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
+                chestCont.appendChild(el);
+            });
+            if (state.message) msg(state.message);
+        }
+
+        function renderPlayers(players) {
+            const layer = getEl('playersLayer'); const activeIds = new Set();
+            for (const id in players) {
+                const p = players[id]; if (!p.alive) continue; activeIds.add(id);
+                let el = getEl('player-' + id);
+                if (!el) {
+                    el = document.createElement('div'); el.className = 'icon ' + (id === myId ? 'playerIconSelf' : 'playerIconOther');
+                    el.id = 'player-' + id; el.textContent = '🏃';
+                    el.innerHTML += `<div class="nameTag">${p.username}</div>`;
+                    const comp = document.createElement('div'); comp.id = 'comp-' + id; comp.className = 'icon friendlyWolfIcon'; comp.textContent = '🐕';
+                    el.appendChild(comp); layer.appendChild(el);
+                }
+                el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+                const comp = getEl('comp-' + id); comp.style.display = p.companion.active ? 'flex' : 'none';
+            }
+            Array.from(layer.children).forEach(el => { if (!activeIds.has(el.id.replace('player-', ''))) el.remove(); });
+        }
+
+        function renderInventory(player) {
+            const list = getEl('invList'); list.innerHTML = '';
+            player.inventory.forEach((item, i) => {
+                const el = document.createElement('div'); el.className = 'inv-item';
+                el.innerHTML = `<span class="key-hint">${i + 1}</span> ${item.icon} ${item.name}`;
+                el.onclick = () => sendActionToServer('useItem', { index: i });
+                list.appendChild(el);
+            });
+        }
+
+        function toggleInventory() { getEl('inventory-sidebar').classList.toggle('visible'); }
+        function msg(txt) { const t = getEl('storyText'); t.innerText = txt; t.style.opacity = 1; setTimeout(() => { if (initialMessageCleared) t.style.opacity = 0; }, 3000); }
+        function endGame(win, reason) {
+            getEl('gameOverOverlay').style.display = 'flex';
+            getEl('endTitle').textContent = win ? "VICTORY" : "DEFEAT";
+            getEl('endReason').textContent = reason;
+            gameActive = false;
+        }
     </script>
 </body>
+
 </html>
