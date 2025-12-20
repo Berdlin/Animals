@@ -49,7 +49,6 @@
             position: absolute;
             top: 0;
             left: 0;
-            /* Will-change helps browser optimize rendering for movement */
             will-change: transform;
         }
 
@@ -67,10 +66,7 @@
             pointer-events: none;
         }
 
-        /* --- MOBILE TWEAKS --- */
         @media (max-width: 768px) {
-
-            /* Make minimap smaller on mobile */
             #minimap-container {
                 width: 80px;
                 height: 80px;
@@ -220,7 +216,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 300px;
+            width: 320px;
             background: rgba(0, 0, 0, 0.95);
             border: 2px solid #00ff00;
             padding: 20px;
@@ -234,6 +230,7 @@
         #adminPanel h2 {
             margin-top: 0;
             border-bottom: 1px solid #00ff00;
+            text-align: center;
         }
 
         .admin-row {
@@ -249,6 +246,7 @@
             border: 1px solid #00ff00;
             color: #fff;
             padding: 5px;
+            text-align: center;
         }
 
         .admin-btn {
@@ -259,11 +257,31 @@
             padding: 8px;
             cursor: pointer;
             margin-top: 10px;
+            font-weight: bold;
         }
 
-        .admin-btn:hover {
+        .admin-btn-small {
+            width: auto;
+            padding: 5px 15px;
+            margin: 0;
+            background: #004400;
+        }
+
+        .admin-btn:hover,
+        .admin-btn-small:hover {
             background: #00ff00;
             color: #000;
+        }
+
+        .admin-danger {
+            background: #330000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .admin-danger:hover {
+            background: #ff0000;
+            color: white;
         }
 
         /* Entities */
@@ -366,7 +384,7 @@
             pointer-events: none;
         }
 
-        /* --- COMPANION MODAL (SCROLLABLE) --- */
+        /* --- COMPANION MODAL --- */
         #dogStatsModal {
             position: absolute;
             top: 50%;
@@ -383,18 +401,13 @@
             box-shadow: 0 0 20px rgba(0, 191, 255, 0.3);
         }
 
-        /* Updated: Makes the inner content scrollable */
         #dogStatsContent {
             max-height: 250px;
-            /* Limits height */
             overflow-y: auto;
-            /* Adds scrollbar if needed */
             margin-bottom: 10px;
             padding-right: 5px;
-            /* Space for scrollbar */
         }
 
-        /* Custom Scrollbar for Modal */
         #dogStatsContent::-webkit-scrollbar {
             width: 5px;
         }
@@ -618,9 +631,19 @@
                     value="100"></div>
             <div class="admin-row"><label>Set DMG:</label><input type="number" id="admDmg" class="admin-input"
                     value="10"></div>
-            <div class="admin-row"><label>Player Speed:</label><input type="number" id="admSpeed" class="admin-input"
+            <div class="admin-row"><label>Speed:</label><input type="number" id="admSpeed" class="admin-input"
                     value="6"></div>
-            <button class="admin-btn" onclick="applyAdminSettings()">APPLY CHANGES</button>
+
+            <hr style="border-color: #00ff00; opacity: 0.3;">
+
+            <div class="admin-row">
+                <label>Spawn Dogs:</label>
+                <input type="number" id="admDogCount" class="admin-input" value="1" min="1" max="50">
+                <button class="admin-btn admin-btn-small" onclick="adminSpawnDogs()">+</button>
+            </div>
+
+            <button class="admin-btn" onclick="applyAdminSettings()">APPLY STATS</button>
+            <button class="admin-btn admin-danger" onclick="adminKillWolves()">KILL ALL WOLVES</button>
             <button class="admin-btn" onclick="closeAdmin()">CLOSE</button>
         </div>
 
@@ -699,15 +722,11 @@
         let mobileTapCount = 0;
         let mobileTapTimer = null;
 
-        // --- NEW: Time Tracking for Smooth Movement ---
         let lastTime = 0;
 
         function init() {
             startLevel(1);
-
-            // CHANGED: Use requestAnimationFrame instead of setInterval for smoother loop
             requestAnimationFrame(gameLoop);
-
             setInterval(timerLoop, 1000);
             window.addEventListener('keydown', handleDown);
             window.addEventListener('keyup', handleUp);
@@ -755,12 +774,23 @@
         function startLevel(lvl) {
             currentLevel = lvl;
             gameState = 'collection';
-            timeLeft = 25;
+            timeLeft = 25; // Constant loot time per day
             player.x = 750; player.y = 750;
 
+            // Ensure key states are reset so player doesn't get stuck walking
+            keyStates = {};
+            joyActive = false;
+            joyData = { x: 0, y: 0 };
+            if (joyKnob) joyKnob.style.transform = `translate(-50%, -50%)`;
+
+            // Heal dogs and buff them slightly each day
             companions.forEach(dog => {
-                dog.level++; dog.maxHp += 20; dog.hp = Math.min(dog.maxHp, dog.hp + 50);
-                dog.dmg += 5; dog.x = player.x; dog.y = player.y;
+                dog.level++;
+                dog.maxHp += 20;
+                dog.hp = Math.min(dog.maxHp, dog.hp + 50);
+                dog.dmg += 5;
+                dog.x = player.x;
+                dog.y = player.y;
             });
 
             document.getElementById('gameOverOverlay').style.display = 'none';
@@ -785,7 +815,11 @@
             wolves = [];
             const container = document.getElementById('wolvesContainer');
             container.innerHTML = '';
-            let count = (level === 1) ? 1 : Math.min(level + 1, 30);
+
+            // Limit max wolves on screen to 50 to prevent lag, but scale stats infinitely
+            let count = (level === 1) ? 1 : Math.min(level + 1, 50);
+
+            // Infinite Scaling of Stats
             const wolfHP = level * 80 + 50;
             const wolfDMG = level * 5 + 5;
 
@@ -815,7 +849,8 @@
 
         function generateReward(level) {
             const rand = Math.random() * 100;
-            let badChance = (level === 1) ? 50 : 20;
+            // Less curse chance as days go by
+            let badChance = Math.max(10, 50 - (level * 2));
             if (rand < badChance) {
                 return [{ name: "Cursed Blade", type: "curse_dmg", val: -5, icon: "💀" },
                 { name: "Blood Debt", type: "hp_half", val: 0.5, icon: "🩸" },
@@ -851,13 +886,12 @@
             camera.x = Math.min(0, Math.max(camera.x, stage.clientWidth - MAP_SIZE));
             camera.y = Math.min(0, Math.max(camera.y, stage.clientHeight - MAP_SIZE));
 
-            // Use translate3d for better GPU performance (reduces lag)
             viewport.style.transform = `translate3d(${camera.x}px, ${camera.y}px, 0)`;
         }
 
         function updateMinimap() {
             const mm = document.getElementById('minimap-container');
-            const scale = mm.clientWidth / MAP_SIZE; // Use actual clientWidth for responsiveness
+            const scale = mm.clientWidth / MAP_SIZE;
             mm.innerHTML = '';
 
             const pDot = document.createElement('div');
@@ -895,16 +929,18 @@
             });
         }
 
-        // --- UPDATED GAME LOOP (Fixes Lag) ---
         function gameLoop(timestamp) {
-            if (gameState === 'over') return;
+            // FIX: If game is over, we keep loop running but idle. 
+            // This prevents the loop from dying and causing lag/freezes on restart.
+            if (gameState === 'over') {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
 
-            // Calculate Delta Time (seconds passed since last frame)
             if (!lastTime) lastTime = timestamp;
             const dt = (timestamp - lastTime) / 1000;
             lastTime = timestamp;
 
-            // Normalize Speed: (Speed * 30 * dt) keeps it consistent with old 30FPS logic
             const timeScale = dt * 30;
 
             let dx = 0, dy = 0;
@@ -945,7 +981,6 @@
             }
             updateHUD();
 
-            // Loop again
             requestAnimationFrame(gameLoop);
         }
 
@@ -1007,7 +1042,12 @@
             });
         }
 
-        function checkVictory() { if (wolves.every(w => w.hp <= 0)) triggerGameOver(true, "Wave Defeated"); }
+        function checkVictory() {
+            if (wolves.every(w => w.hp <= 0)) {
+                // VICTORY - Allows infinite progression
+                triggerGameOver(true, "Wave Defeated");
+            }
+        }
 
         function triggerHit(val) {
             player.invulnerable = true;
@@ -1024,7 +1064,7 @@
         function useItem(idx, isAuto = false, itemObj = null) {
             const item = isAuto ? itemObj : items[idx];
             if (!item) return;
-            if (item.type === 'potion') { companions.push({ x: player.x, y: player.y, hp: 100, maxHp: 100, dmg: 15, level: 1 }); renderCompanions(); }
+            if (item.type === 'potion') { companions.push({ x: player.x, y: player.y, hp: 100 + (currentLevel * 10), maxHp: 100 + (currentLevel * 10), dmg: 15 + currentLevel, level: 1 }); renderCompanions(); }
             else if (item.type === 'sword') dmg += item.val;
             else if (item.type === 'hp') hp = Math.min(maxHp, hp + item.val);
             else if (item.type === 'shield') { maxHp += item.val; hp += item.val; }
@@ -1083,10 +1123,7 @@
             if (wasVisible && mobileTapCount >= 5) {
                 document.getElementById('adminPanel').style.display = 'block';
                 showAlert("ADMIN MODE ACTIVATED", "#00ff00");
-                document.getElementById('admDay').value = currentLevel;
-                document.getElementById('admHp').value = hp;
-                document.getElementById('admDmg').value = dmg;
-                document.getElementById('admSpeed').value = PLAYER_SPEED;
+                updateAdminInputValues();
                 mobileTapCount = 0; // Reset
             }
         }
@@ -1097,10 +1134,7 @@
             if (e.shiftKey && k === 'a') {
                 document.getElementById('adminPanel').style.display = 'block';
                 showAlert("ADMIN MODE ENTERED", "#00ff00");
-                document.getElementById('admDay').value = currentLevel;
-                document.getElementById('admHp').value = hp;
-                document.getElementById('admDmg').value = dmg;
-                document.getElementById('admSpeed').value = PLAYER_SPEED;
+                updateAdminInputValues();
             }
 
             if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
@@ -1118,14 +1152,51 @@
             keyStates[key] = false;
         }
 
+        function updateAdminInputValues() {
+            document.getElementById('admDay').value = currentLevel;
+            document.getElementById('admHp').value = hp;
+            document.getElementById('admDmg').value = dmg;
+            document.getElementById('admSpeed').value = PLAYER_SPEED;
+        }
+
         function applyAdminSettings() {
             currentLevel = parseInt(document.getElementById('admDay').value);
             hp = parseInt(document.getElementById('admHp').value);
             dmg = parseInt(document.getElementById('admDmg').value);
             PLAYER_SPEED = parseInt(document.getElementById('admSpeed').value);
-            closeAdmin();
-            showAlert("ADMIN SETTINGS APPLIED", "#00ff00");
+            showAlert("STATS UPDATED", "#00ff00");
         }
+
+        // --- NEW ADMIN FUNCTIONS ---
+        function adminSpawnDogs() {
+            const count = parseInt(document.getElementById('admDogCount').value) || 1;
+            for (let i = 0; i < count; i++) {
+                companions.push({
+                    // Spawns very close to player (approx. 5px radius = "1mm apart")
+                    x: player.x + (Math.random() * 10 - 5),
+                    y: player.y + (Math.random() * 10 - 5),
+                    hp: 150 + (currentLevel * 20),
+                    maxHp: 150 + (currentLevel * 20),
+                    dmg: 15 + (currentLevel * 2),
+                    level: 1,
+                    cooldown: 0
+                });
+            }
+            renderCompanions();
+            showAlert(`${count} DOGS SPAWNED`, "#00bfff");
+        }
+
+        function adminKillWolves() {
+            wolves.forEach(w => {
+                w.hp = 0;
+                // Visually update bar
+                const wBar = document.getElementById(`wolf-hp-${w.id}`);
+                if (wBar) wBar.style.width = '0%';
+            });
+            checkVictory();
+            showAlert("ALL WOLVES ELIMINATED", "#ff0000");
+        }
+
         function closeAdmin() { document.getElementById('adminPanel').style.display = 'none'; }
 
         function timerLoop() {
@@ -1154,7 +1225,6 @@
             setTimeout(() => t.style.opacity = 0, 3000);
         }
 
-        // --- NEW RECORD LOGIC (LOCAL ONLY) ---
         function triggerGameOver(win, reason) {
             gameState = 'over';
             document.getElementById('gameOverOverlay').style.display = 'flex';
@@ -1173,7 +1243,6 @@
             const msgBox = document.getElementById('newRecordMsg');
             msgBox.innerHTML = "";
 
-            // 1. Check Local Device "World" Record
             if (days > localHigh) {
                 localStorage.setItem('feral_localHighscore', days);
                 localStorage.setItem('feral_localChampion', username);
@@ -1181,7 +1250,6 @@
                 return;
             }
 
-            // 2. Check Personal Best
             if (days > pb) {
                 localStorage.setItem('feral_personalBest', days);
                 msgBox.innerText = `NEW PERSONAL BEST! (${days} DAYS)`;
