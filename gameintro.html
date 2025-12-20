@@ -15,15 +15,18 @@
             background-image: radial-gradient(circle at center, #1a0a0a 0%, #000000 100%);
             color: #e0e0e0;
             font-family: 'Lato', sans-serif;
-            height: 100vh;
+            /* Changed height to min-height and hidden to auto to allow scrolling */
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         .background-fx {
-            position: absolute;
+            position: fixed;
+            /* Changed to fixed so it stays behind while scrolling */
             top: 0;
             left: 0;
             width: 100%;
@@ -32,14 +35,18 @@
             opacity: 0.3;
             animation: pulseBg 10s infinite alternate;
             z-index: 0;
+            pointer-events: none;
         }
 
         .container {
             position: relative;
             z-index: 10;
             max-width: 800px;
+            width: 90%;
             text-align: center;
             padding: 40px;
+            margin: 40px 20px;
+            /* Added margin for scroll spacing */
             border: 2px solid #500;
             background-color: rgba(0, 0, 0, 0.9);
             box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);
@@ -120,22 +127,24 @@
             background: rgba(0, 0, 0, 0.98);
             z-index: 100;
             overflow-y: auto;
+            /* Ensures long manuals can be scrolled */
         }
 
         .modal-content {
             background: #0f0f0f;
-            margin: 2% auto;
+            margin: 5% auto;
             padding: 30px;
             border: 1px solid #00bfff;
             width: 85%;
             max-width: 900px;
             color: #ccc;
             border-radius: 5px;
+            position: relative;
         }
 
         .control-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
             text-align: left;
             margin-top: 10px;
@@ -259,8 +268,14 @@
             }
         };
 
-        function openTutorial() { document.getElementById('tutorialModal').style.display = 'block'; }
-        function closeTutorial() { document.getElementById('tutorialModal').style.display = 'none'; }
+        function openTutorial() {
+            document.getElementById('tutorialModal').style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Stop background scrolling when modal is open
+        }
+        function closeTutorial() {
+            document.getElementById('tutorialModal').style.display = 'none';
+            document.body.style.overflow = 'auto'; // Re-enable scrolling
+        }
     </script>
 </body>
 
