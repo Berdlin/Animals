@@ -68,4 +68,4 @@ socket.on('lobbyUpdate', (players) => {
 });
 
 socket.on('gameStarted', () => { window.location.href = 'multiplay.html'; });
-socket.on('hostLeft', (msg) => { alert(msg); window.location.href = 'gameintro.html'; });
+socket.on('hostLeft', (msg) => { alert(msg); window.location.href = 'index.html'; });
