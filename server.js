@@ -9,6 +9,7 @@ const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -83,9 +84,9 @@ async function withRetry(operation, maxRetries = 3) {
 
 // Neon database connection with connection pooling
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_3F2dozATYlEZ@ep-solitary-leaf-at9wmy7w-pooler.c-9.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require',
+  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_3F2dozATYlEZ@ep-solitary-leaf-at9wmy7w-pooler.c-9.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=verify-full',
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: true
   },
   max: 20, // Maximum pool size
   idleTimeoutMillis: 30000,
