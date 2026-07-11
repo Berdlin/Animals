@@ -1,0 +1,19 @@
+{
+  "name": "feral-pursuit",
+  "version": "1.0.0",
+  "description": "Survival game with Neon database integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "pg": "^8.11.3",
+    "socket.io": "^4.7.2"
+  }
+}

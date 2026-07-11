@@ -493,15 +493,51 @@
             margin-top: 10px;
             font-weight: bold;
             animation: pulseRecord 1s infinite;
+            text-shadow: 0 0 10px #00ff00;
         }
 
         @keyframes pulseRecord {
             0% {
                 opacity: 0.5;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
             }
 
             100% {
+                opacity: 0.5;
+                transform: scale(1);
+            }
+        }
+
+        .record-celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4em;
+            z-index: 300;
+            animation: celebrate 2s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes celebrate {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+
+            50% {
                 opacity: 1;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.5) translateY(-100px);
             }
         }
 
@@ -738,9 +774,8 @@
         const joyBase = document.getElementById('joystickZone');
         const joyKnob = document.getElementById('joystickKnob');
 
-        // --- MOBILE ADMIN TRIGGER VARS ---
-        let mobileTapCount = 0;
-        let mobileTapTimer = null;
+        // --- DESKTOP ADMIN TRIGGER VARS ---
+        let adminUnlocked = false;
 
         let lastTime = 0;
 
@@ -750,15 +785,6 @@
             setInterval(timerLoop, 1000);
             window.addEventListener('keydown', handleDown);
             window.addEventListener('keyup', handleUp);
-
-            // Mobile Admin Tap Listener
-            document.addEventListener('touchstart', (e) => {
-                if (e.target.classList.contains('mob-btn') || e.target.closest('#joystickZone')) return;
-
-                mobileTapCount++;
-                if (mobileTapTimer) clearTimeout(mobileTapTimer);
-                mobileTapTimer = setTimeout(() => { mobileTapCount = 0; }, 2000);
-            });
 
             initJoystick();
 
@@ -789,7 +815,7 @@
             startLevel(1);
         }
 
-        function exitGame() { window.location.href = 'gameintro.html'; }
+        function exitGame() { window.location.href = 'index.html'; }
 
         function startLevel(lvl) {
             currentLevel = lvl;
@@ -1135,23 +1161,14 @@
 
         function toggleInventory() {
             const panel = document.getElementById('inventoryPanel');
-            const wasVisible = panel.classList.contains('visible');
             panel.classList.toggle('visible');
-
-            // --- MOBILE ADMIN CHECK ---
-            // "Tap screen 5 times, then open inventory and close it"
-            if (wasVisible && mobileTapCount >= 5) {
-                document.getElementById('adminPanel').style.display = 'block';
-                showAlert("ADMIN MODE ACTIVATED", "#00ff00");
-                updateAdminInputValues();
-                mobileTapCount = 0; // Reset
-            }
         }
 
         function handleDown(e) {
             const k = e.key.toLowerCase();
 
-            if (e.shiftKey && k === 'a') {
+            // Desktop-only admin access: Shift + A
+            if (e.shiftKey && k === 'a' && !isMobile) {
                 document.getElementById('adminPanel').style.display = 'block';
                 showAlert("ADMIN MODE ENTERED", "#00ff00");
                 updateAdminInputValues();
@@ -1256,24 +1273,69 @@
             checkRecords(currentLevel);
         }
 
-        function checkRecords(days) {
+        async function checkRecords(days) {
             const username = localStorage.getItem('gameUsername') || "Unknown";
             const pb = parseInt(localStorage.getItem('feral_personalBest') || "0");
             const localHigh = parseInt(localStorage.getItem('feral_localHighscore') || "0");
             const msgBox = document.getElementById('newRecordMsg');
             msgBox.innerHTML = "";
 
+            let newRecordAchieved = false;
+
+            // Update personal best
+            if (days > pb) {
+                localStorage.setItem('feral_personalBest', days);
+                msgBox.innerHTML += `NEW PERSONAL BEST! (${days} DAYS)<br>`;
+                newRecordAchieved = true;
+            }
+
+            // Update local device record
             if (days > localHigh) {
                 localStorage.setItem('feral_localHighscore', days);
                 localStorage.setItem('feral_localChampion', username);
-                msgBox.innerText = `NEW LOCAL RECORD! (${days} DAYS)`;
-                return;
+                msgBox.innerHTML += `NEW LOCAL RECORD! (${days} DAYS)<br>`;
+                newRecordAchieved = true;
             }
 
-            if (days > pb) {
-                localStorage.setItem('feral_personalBest', days);
-                msgBox.innerText = `NEW PERSONAL BEST! (${days} DAYS)`;
+            // Update total games and total days for profile
+            const totalGames = parseInt(localStorage.getItem('feral_totalGames') || "0") + 1;
+            const totalDays = parseInt(localStorage.getItem('feral_totalDays') || "0") + days;
+            localStorage.setItem('feral_totalGames', totalGames);
+            localStorage.setItem('feral_totalDays', totalDays);
+
+            // Check and save world record to Neon database
+            try {
+                const response = await fetch('/api/world-record', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ player_name: username, days_survived: days })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    msgBox.innerHTML += `🏆 NEW WORLD RECORD! (${days} DAYS) 🏆`;
+                    newRecordAchieved = true;
+                    showCelebration('🏆');
+                }
+            } catch (error) {
+                console.error('Failed to save world record:', error);
             }
+
+            // Show celebration for any new record
+            if (newRecordAchieved) {
+                showCelebration('⭐');
+            }
+        }
+
+        function showCelebration(emoji) {
+            const celebration = document.createElement('div');
+            celebration.className = 'record-celebration';
+            celebration.textContent = emoji;
+            document.body.appendChild(celebration);
+            
+            setTimeout(() => {
+                celebration.remove();
+            }, 2000);
         }
 
         function nextLevel() { startLevel(currentLevel + 1); }

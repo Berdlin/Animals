@@ -225,7 +225,7 @@
                 <div class="record-holder">DAYS SURVIVED</div>
             </div>
             <div class="record-box world">
-                <div class="record-title">LOCAL DEVICE RECORD</div>
+                <div class="record-title">WORLD RECORD</div>
                 <div class="record-val" id="wrDisplay">--</div>
                 <div class="record-holder" id="wrHolder">NO DATA</div>
             </div>
@@ -248,9 +248,13 @@
             5. <strong>Permadeath:</strong> If a companion dies, they are gone forever.
         </p>
         <div class="btn-group">
-            <a href="gamestart.html" class="btn">Start Single Player</a>
+            <a href="singleplayer.html" class="btn">Start Single Player</a>
             <a href="gamelobby.html" class="btn" style="border-color: #4CAF50;">Multiplayer Lobby</a>
+            <a href="leaderboard.html" class="btn" style="border-color: #ffd700;">🏆 Leaderboard</a>
+            <a href="profile.html" class="btn" style="border-color: #00bfff;">👤 Profile</a>
+            <a href="stats.html" class="btn" style="border-color: #9b59b6;">📊 Statistics</a>
             <button class="btn btn-info" onclick="openTutorial()">Field Manual (Controls)</button>
+            <button class="btn" style="border-color: #ff0000; background-color: #330000;" onclick="logout()">Logout</button>
         </div>
     </div>
 
@@ -282,21 +286,103 @@
     </div>
 
     <script>
-        window.onload = function () {
-            // Load Personal Best
+        window.onload = async function () {
+            // Check session - redirect to login if not authenticated
+            try {
+                const response = await fetch('/api/auth/session');
+                const data = await response.json();
+                
+                if (!data.authenticated) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Load Personal Best from local storage
             const myBest = localStorage.getItem('feral_personalBest') || "0";
             document.getElementById('pbDisplay').innerText = `${myBest}`;
 
-            // Load Local Device High Score (Instead of Online World Record)
-            const localHigh = localStorage.getItem('feral_localHighscore') || "0";
-            const localChamp = localStorage.getItem('feral_localChampion') || "None";
-
-            document.getElementById('wrDisplay').innerText = localHigh;
-            document.getElementById('wrHolder').innerText = `HELD BY: ${localChamp.toUpperCase()}`;
+            // Load World Record from Neon database
+            fetchWorldRecord();
         };
+
+        async function fetchWorldRecord() {
+            const wrDisplay = document.getElementById('wrDisplay');
+            const wrHolder = document.getElementById('wrHolder');
+            
+            // Show loading state
+            wrDisplay.innerText = "...";
+            wrHolder.innerText = "LOADING...";
+
+            try {
+                const response = await fetch('/api/world-record');
+                const data = await response.json();
+                
+                if (data.player_name && data.player_name !== 'None') {
+                    wrDisplay.innerText = data.days_survived;
+                    wrHolder.innerText = `HELD BY: ${data.player_name.toUpperCase()}`;
+                } else {
+                    wrDisplay.innerText = "0";
+                    wrHolder.innerText = "NO DATA";
+                }
+            } catch (error) {
+                console.error('Failed to fetch world record:', error);
+                // Offline mode fallback - use local storage
+                const localHigh = localStorage.getItem('feral_localHighscore') || "0";
+                const localChamp = localStorage.getItem('feral_localChampion') || "None";
+                wrDisplay.innerText = localHigh;
+                wrHolder.innerText = `LOCAL: ${localChamp.toUpperCase()}`;
+                showAlert("Offline mode - using local records", "warning");
+            }
+        }
+
+        function showAlert(message, type) {
+            // Create a temporary alert element
+            const alert = document.createElement('div');
+            alert.style.position = 'fixed';
+            alert.style.top = '20px';
+            alert.style.left = '50%';
+            alert.style.transform = 'translateX(-50%)';
+            alert.style.padding = '10px 20px';
+            alert.style.borderRadius = '5px';
+            alert.style.zIndex = '1000';
+            alert.style.fontWeight = 'bold';
+            
+            if (type === 'warning') {
+                alert.style.backgroundColor = '#ff6347';
+                alert.style.color = 'white';
+            } else {
+                alert.style.backgroundColor = '#4CAF50';
+                alert.style.color = 'white';
+            }
+            
+            alert.textContent = message;
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
 
         function openTutorial() { document.getElementById('tutorialModal').style.display = 'block'; document.body.style.overflow = 'hidden'; }
         function closeTutorial() { document.getElementById('tutorialModal').style.display = 'none'; document.body.style.overflow = 'auto'; }
+
+        async function logout() {
+            try {
+                const response = await fetch('/api/auth/logout', {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    window.location.href = 'login.html';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
     </script>
 </body>
 

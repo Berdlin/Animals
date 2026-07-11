@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feral Pursuit - Hunter Profile</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@300;400&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            background-image: radial-gradient(circle at center, #1a0a0a 0%, #000000 100%);
+            color: #e0e0e0;
+            font-family: 'Lato', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .background-fx {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://www.transparenttextures.com/patterns/dark-matter.png');
+            opacity: 0.3;
+            animation: pulseBg 10s infinite alternate;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 900px;
+            width: 90%;
+            text-align: center;
+            padding: 40px;
+            border: 2px solid #500;
+            background-color: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            color: #ff4500;
+            font-size: 3em;
+            text-shadow: 0 0 15px rgba(255, 69, 0, 0.7);
+            margin-bottom: 10px;
+        }
+
+        .player-name {
+            font-family: 'Cinzel', serif;
+            color: #ffd700;
+            font-size: 2em;
+            margin-bottom: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-box {
+            background: #110;
+            border: 1px solid #ffd700;
+            padding: 20px;
+            color: #ffd700;
+            font-family: 'Cinzel', serif;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            opacity: 0.8;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .achievements-section {
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .achievements-title {
+            font-family: 'Cinzel', serif;
+            color: #00bfff;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #00bfff;
+            padding-bottom: 10px;
+        }
+
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .achievement {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            opacity: 0.5;
+        }
+
+        .achievement.unlocked {
+            opacity: 1;
+            border-color: #00bfff;
+            box-shadow: 0 0 10px rgba(0, 191, 255, 0.2);
+        }
+
+        .achievement-icon {
+            font-size: 2em;
+        }
+
+        .achievement-info h4 {
+            margin: 0 0 5px 0;
+            color: #fff;
+            font-family: 'Cinzel', serif;
+        }
+
+        .achievement-info p {
+            margin: 0;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: #300;
+            color: #fff;
+            text-decoration: none;
+            font-family: 'Cinzel', serif;
+            font-size: 1.2em;
+            border: 2px solid #ff4500;
+            border-radius: 5px;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            background-color: #ff4500;
+            color: #000;
+        }
+
+        @keyframes pulseBg {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-fx"></div>
+    <div class="container">
+        <h1>HUNTER PROFILE</h1>
+        <div class="player-name" id="playerName">UNKNOWN HUNTER</div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-label">PERSONAL BEST</div>
+                <div class="stat-value" id="personalBest">0</div>
+                <div class="stat-label">DAYS SURVIVED</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">TOTAL GAMES</div>
+                <div class="stat-value" id="totalGames">0</div>
+                <div class="stat-label">PLAYED</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">TOTAL DAYS</div>
+                <div class="stat-value" id="totalDays">0</div>
+                <div class="stat-label">CUMULATIVE</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">AVG SURVIVAL</div>
+                <div class="stat-value" id="avgSurvival">0</div>
+                <div class="stat-label">DAYS PER GAME</div>
+            </div>
+        </div>
+
+        <div class="achievements-section">
+            <div class="achievements-title">🏅 ACHIEVEMENTS</div>
+            <div class="achievements-grid" id="achievementsGrid"></div>
+        </div>
+
+        <div class="btn-group">
+            <a href="index.html" class="btn">Return to Main Menu</a>
+            <a href="leaderboard.html" class="btn" style="border-color: #ffd700;">🏆 Leaderboard</a>
+        </div>
+    </div>
+
+    <script>
+        const achievements = [
+            { id: 'first_blood', name: 'First Blood', desc: 'Survive your first day', icon: '🩸', condition: (stats) => stats.personalBest >= 1 },
+            { id: 'week_survivor', name: 'Week Survivor', desc: 'Survive 7 days', icon: '📅', condition: (stats) => stats.personalBest >= 7 },
+            { id: 'month_survivor', name: 'Month Survivor', desc: 'Survive 30 days', icon: '🌙', condition: (stats) => stats.personalBest >= 30 },
+            { id: 'century', name: 'Century', desc: 'Survive 100 days', icon: '💯', condition: (stats) => stats.personalBest >= 100 },
+            { id: 'veteran', name: 'Veteran', desc: 'Play 10 games', icon: '⚔️', condition: (stats) => stats.totalGames >= 10 },
+            { id: 'dedicated', name: 'Dedicated', desc: 'Play 50 games', icon: '🎖️', condition: (stats) => stats.totalGames >= 50 },
+            { id: 'accumulator', name: 'Accumulator', desc: 'Total 100 days survived', icon: '📊', condition: (stats) => stats.totalDays >= 100 },
+            { id: 'master', name: 'Master', desc: 'Total 1000 days survived', icon: '👑', condition: (stats) => stats.totalDays >= 1000 },
+        ];
+
+        function loadProfile() {
+            const username = localStorage.getItem('gameUsername') || 'Unknown Hunter';
+            const personalBest = parseInt(localStorage.getItem('feral_personalBest') || '0');
+            const totalGames = parseInt(localStorage.getItem('feral_totalGames') || '0');
+            const totalDays = parseInt(localStorage.getItem('feral_totalDays') || '0');
+            const avgSurvival = totalGames > 0 ? (totalDays / totalGames).toFixed(1) : '0';
+
+            document.getElementById('playerName').textContent = username.toUpperCase();
+            document.getElementById('personalBest').textContent = personalBest;
+            document.getElementById('totalGames').textContent = totalGames;
+            document.getElementById('totalDays').textContent = totalDays;
+            document.getElementById('avgSurvival').textContent = avgSurvival;
+
+            // Load achievements
+            const stats = { personalBest, totalGames, totalDays };
+            const achievementsGrid = document.getElementById('achievementsGrid');
+            const unlockedAchievements = JSON.parse(localStorage.getItem('feral_achievements') || '[]');
+
+            achievements.forEach(achievement => {
+                const isUnlocked = unlockedAchievements.includes(achievement.id) || achievement.condition(stats);
+                
+                const achievementEl = document.createElement('div');
+                achievementEl.className = `achievement ${isUnlocked ? 'unlocked' : ''}`;
+                achievementEl.innerHTML = `
+                    <div class="achievement-icon">${achievement.icon}</div>
+                    <div class="achievement-info">
+                        <h4>${achievement.name}</h4>
+                        <p>${achievement.desc}</p>
+                    </div>
+                `;
+                achievementsGrid.appendChild(achievementEl);
+
+                // Save newly unlocked achievements
+                if (isUnlocked && !unlockedAchievements.includes(achievement.id)) {
+                    unlockedAchievements.push(achievement.id);
+                    localStorage.setItem('feral_achievements', JSON.stringify(unlockedAchievements));
+                }
+            });
+        }
+
+        window.onload = loadProfile;
+    </script>
+</body>
+</html>
