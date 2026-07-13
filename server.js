@@ -532,56 +532,271 @@ const rooms = new Map(); // In-memory room state for real-time updates
 const gameLoops = new Map(); // Store game loop intervals
 const games = {}; // Global game state for multiplayer
 
+// Helper function to spawn wolves based on day level
+function spawnWolvesForDay(gameState, day) {
+  gameState.wolves = [];
+  const count = (day === 1) ? 1 : Math.min(day + 1, 50);
+  const wolfHP = day * 80 + 50;
+  const wolfDMG = day * 5 + 5;
+  const MAP_SIZE = 1500;
+
+  for (let i = 0; i < count; i++) {
+    let wx = Math.random() > 0.5 ? -100 : MAP_SIZE + 100;
+    let wy = Math.random() * MAP_SIZE;
+    gameState.wolves.push({
+      id: i,
+      x: wx,
+      y: wy,
+      hp: wolfHP,
+      maxHp: wolfHP,
+      dmg: wolfDMG
+    });
+  }
+}
+
+// Helper function to spawn chests
+function spawnChests(gameState) {
+  gameState.chests = [];
+  const MAP_SIZE = 1500;
+  for (let i = 0; i < 12; i++) {
+    const rand = Math.random() * 100;
+    let badChance = Math.max(10, 50 - (gameState.currentDay * 2));
+    let reward;
+    
+    if (rand < badChance) {
+      const badRewards = [
+        { name: "Cursed Blade", type: "curse_dmg", val: -5, icon: "💀" },
+        { name: "Blood Debt", type: "hp_half", val: 0.5, icon: "🩸" },
+        { name: "Rotten Meat", type: "hp_loss", val: -25, icon: "🥩" }
+      ];
+      reward = badRewards[Math.floor(Math.random() * 3)];
+    } else if (rand < badChance + 15) {
+      reward = { name: "Summon Dog", type: "potion", icon: "🐕" };
+    } else {
+      const goodRewards = [
+        { name: "Steel Sword", type: "sword", val: 12, icon: "⚔️" },
+        { name: "Health Kit", type: "hp", val: 40, icon: "🍷" },
+        { name: "Plate Armor", type: "shield", val: 60, icon: "🛡️" }
+      ];
+      reward = goodRewards[Math.floor(Math.random() * 3)];
+    }
+    
+    gameState.chests.push({
+      x: Math.random() * (MAP_SIZE - 100) + 50,
+      y: Math.random() * (MAP_SIZE - 100) + 50,
+      opened: false,
+      reward: reward
+    });
+  }
+}
+
+// Helper function to check if all wolves are dead
+function checkWaveCompletion(gameState, roomCode) {
+  if (gameState.wolves.every(w => w.hp <= 0)) {
+    // Wave complete - increment day and reset
+    gameState.currentDay++;
+    gameState.phase = 'collection';
+    gameState.timer = 25;
+    
+    // Heal all alive players and buff their dogs
+    Object.values(gameState.players).forEach(player => {
+      if (player.alive) {
+        player.hp = Math.min(player.maxHp, player.hp + 30);
+      }
+      // Buff dogs for next day
+      if (player.companion && player.companion.active) {
+        player.companion.level = (player.companion.level || 1) + 1;
+        player.companion.maxHp += 20;
+        player.companion.hp = Math.min(player.companion.maxHp, player.companion.hp + 50);
+        player.companion.dmg += 5;
+      }
+    });
+    
+    // Respawn chests
+    spawnChests(gameState);
+    
+    // Spawn new wolves for next day
+    spawnWolvesForDay(gameState, gameState.currentDay);
+    
+    io.to(roomCode).emit('systemMessage', `Day ${gameState.currentDay} begins!`);
+  }
+}
+
+// Helper function to handle companion AI
+function handleCompanionAI(gameState) {
+  const livingWolves = gameState.wolves.filter(w => w.hp > 0);
+  
+  Object.values(gameState.players).forEach(player => {
+    if (!player.alive || !player.companion || !player.companion.active) return;
+    if (player.companion.hp <= 0) return;
+    
+    const dog = player.companion;
+    const DOG_SPEED = 6.0;
+    const timeScale = 0.05; // Approximate time scale for 50ms tick
+    
+    // Determine target
+    let target;
+    if (gameState.phase === 'chase' && livingWolves.length > 0) {
+      // Target a wolf (round-robin based on dog index)
+      target = livingWolves[Object.keys(gameState.players).indexOf(player.id) % livingWolves.length];
+    } else {
+      // Follow player
+      target = player;
+    }
+    
+    if (target) {
+      const dx = target.x - dog.x;
+      const dy = target.y - dog.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+      
+      if (target === player) {
+        // Follow player
+        if (dist > 60) {
+          dog.x += Math.cos(angle) * (DOG_SPEED + 1) * timeScale;
+          dog.y += Math.sin(angle) * (DOG_SPEED + 1) * timeScale;
+        }
+      } else {
+        // Attack wolf
+        if (dist > 30) {
+          dog.x += Math.cos(angle) * DOG_SPEED * timeScale;
+          dog.y += Math.sin(angle) * DOG_SPEED * timeScale;
+        }
+        // Deal damage if close and cooldown ready
+        if (dist < 50 && Date.now() > (dog.cooldown || 0)) {
+          target.hp -= dog.dmg;
+          dog.cooldown = Date.now() + 800;
+          if (target.hp <= 0) {
+            target.hp = 0;
+          }
+        }
+      }
+    }
+  });
+}
+
+// Helper function to save player records when game ends
+async function savePlayerRecords(gameState, roomCode) {
+  const daysSurvived = gameState.currentDay;
+  
+  for (const playerId in gameState.players) {
+    const player = gameState.players[playerId];
+    const username = player.username || 'Unknown';
+    
+    try {
+      // Check if this is a world record
+      const currentRecord = await pool.query(
+        'SELECT days_survived FROM world_records ORDER BY days_survived DESC LIMIT 1'
+      );
+      
+      const currentBest = currentRecord.rows.length > 0 ? currentRecord.rows[0].days_survived : 0;
+      
+      if (daysSurvived > currentBest) {
+        // Insert new world record
+        await pool.query(
+          'INSERT INTO world_records (player_name, days_survived) VALUES ($1, $2)',
+          [username, daysSurvived]
+        );
+        
+        // Clear cache
+        cache.worldRecord = null;
+        
+        io.to(roomCode).emit('systemMessage', `${username} set a new world record: ${daysSurvived} days!`);
+      }
+    } catch (error) {
+      console.error('Error saving player record:', error);
+    }
+  }
+}
+
 // Game loop function
 function startGameLoop(roomCode) {
   if (gameLoops.has(roomCode)) return;
   
   const interval = setInterval(() => {
-    const room = rooms.get(roomCode);
-    if (!room || room.status !== 'playing') {
+    const gameState = games[roomCode];
+    if (!gameState || gameState.status !== 'playing') {
       clearInterval(interval);
       gameLoops.delete(roomCode);
       return;
     }
     
     // Update timer
-    if (room.gameState.timer > 0) {
-      room.gameState.timer -= 1;
+    if (gameState.timer > 0) {
+      gameState.timer -= 1;
+    } else if (gameState.phase === 'collection') {
+      // Timer ended - switch to chase phase
+      gameState.phase = 'chase';
+      io.to(roomCode).emit('systemMessage', 'The hunt begins!');
     }
     
-    // Simple wolf AI - move towards nearest player
-    if (room.gameState.wolf && room.gameState.wolf.hp > 0) {
-      let nearestPlayer = null;
-      let nearestDist = Infinity;
-      
-      Object.values(room.gameState.players).forEach(player => {
-        if (!player.alive) return;
-        const dist = Math.sqrt(
-          Math.pow(player.x - room.gameState.wolf.x, 2) +
-          Math.pow(player.y - room.gameState.wolf.y, 2)
-        );
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestPlayer = player;
+    // Wolf AI - move towards nearest player
+    if (gameState.phase === 'chase') {
+      gameState.wolves.forEach(wolf => {
+        if (wolf.hp <= 0) return;
+        
+        let nearestPlayer = null;
+        let nearestDist = Infinity;
+        
+        Object.values(gameState.players).forEach(player => {
+          if (!player.alive) return;
+          const dist = Math.sqrt(
+            Math.pow(player.x - wolf.x, 2) +
+            Math.pow(player.y - wolf.y, 2)
+          );
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestPlayer = player;
+          }
+        });
+        
+        if (nearestPlayer) {
+          const dx = nearestPlayer.x - wolf.x;
+          const dy = nearestPlayer.y - wolf.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > 0) {
+            wolf.x += (dx / dist) * 2;
+            wolf.y += (dy / dist) * 2;
+          }
+          
+          // Damage player if close
+          if (dist < 35) {
+            nearestPlayer.hp -= wolf.dmg;
+            if (nearestPlayer.hp <= 0) {
+              nearestPlayer.hp = 0;
+              nearestPlayer.alive = false;
+              io.to(roomCode).emit('systemMessage', `${nearestPlayer.username} was killed by a wolf!`);
+            }
+          }
         }
       });
       
-      if (nearestPlayer) {
-        const dx = nearestPlayer.x - room.gameState.wolf.x;
-        const dy = nearestPlayer.y - room.gameState.wolf.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist > 0) {
-          room.gameState.wolf.x += (dx / dist) * 2;
-          room.gameState.wolf.y += (dy / dist) * 2;
-        }
-      }
+      // Handle companion AI
+      handleCompanionAI(gameState);
+      
+      // Check wave completion
+      checkWaveCompletion(gameState, roomCode);
+    } else if (gameState.phase === 'collection') {
+      // Handle companion AI during collection phase (dogs follow players)
+      handleCompanionAI(gameState);
+    }
+    
+    // Check if all players are dead
+    const alivePlayers = Object.values(gameState.players).filter(p => p.alive);
+    if (alivePlayers.length === 0) {
+      gameState.status = 'over';
+      gameState.endReason = 'All players have fallen.';
+      io.to(roomCode).emit('gameStateUpdate', gameState);
+      
+      // Save records for all players
+      savePlayerRecords(gameState, roomCode);
     }
     
     // Send game state update
-    io.to(roomCode).emit('gameStateUpdate', room.gameState);
+    io.to(roomCode).emit('gameStateUpdate', gameState);
     
-  }, 1000); // Update every second
+  }, 50); // Update every 50ms for smoother gameplay
   
   gameLoops.set(roomCode, interval);
 }
@@ -729,9 +944,11 @@ io.on('connection', (socket) => {
           // Initialize game state
           room.gameState = {
             status: 'playing',
-            timer: 60,
+            currentDay: 1,
+            phase: 'collection',
+            timer: 25,
             players: {},
-            wolf: { x: 750, y: 750, hp: 100 },
+            wolves: [],
             chests: []
           };
           
@@ -741,6 +958,7 @@ io.on('connection', (socket) => {
               x: 750 + Math.random() * 200 - 100,
               y: 750 + Math.random() * 200 - 100,
               hp: 100,
+              maxHp: 100,
               dmg: 10,
               alive: true,
               username: player.name,
@@ -749,15 +967,11 @@ io.on('connection', (socket) => {
             };
           });
           
+          // Spawn initial wolves based on day
+          spawnWolvesForDay(room.gameState, room.gameState.currentDay);
+          
           // Spawn chests
-          for (let i = 0; i < 12; i++) {
-            room.gameState.chests.push({
-              x: Math.random() * 1400 + 50,
-              y: Math.random() * 1400 + 50,
-              opened: false,
-              reward: { name: 'Health Kit', type: 'hp', val: 20, icon: '🍷' }
-            });
-          }
+          spawnChests(room.gameState);
           
           io.to(roomCode).emit('gameStarted');
           io.to(roomCode).emit('gameStateUpdate', room.gameState);
@@ -783,21 +997,19 @@ io.on('connection', (socket) => {
     if (!games[roomCode]) {
       games[roomCode] = {
         status: 'playing',
-        timer: 60,
+        currentDay: 1,
+        phase: 'collection',
+        timer: 25,
         players: {},
-        chests: [],
-        wolf: { x: 750, y: 750, hp: 100 }
+        wolves: [],
+        chests: []
       };
       
       // Spawn chests
-      for (let i = 0; i < 12; i++) {
-        games[roomCode].chests.push({
-          x: Math.random() * 1400 + 50,
-          y: Math.random() * 1400 + 50,
-          opened: false,
-          reward: { name: 'Health Kit', type: 'hp', val: 20, icon: '🍷' }
-        });
-      }
+      spawnChests(games[roomCode]);
+      
+      // Spawn wolves
+      spawnWolvesForDay(games[roomCode], games[roomCode].currentDay);
     }
 
     // Add player to the live room structure if missing
@@ -808,6 +1020,7 @@ io.on('connection', (socket) => {
         x: 750 + Math.random() * 200 - 100,
         y: 750 + Math.random() * 200 - 100,
         hp: 100,
+        maxHp: 100,
         dmg: 10,
         alive: true,
         companion: { active: false },
@@ -899,20 +1112,20 @@ io.on('connection', (socket) => {
         break;
         
       case 'attack':
-        const wolf = games[roomCode].wolf;
-        if (wolf && wolf.hp > 0) {
-          const dist = Math.sqrt(
-            Math.pow(player.x - wolf.x, 2) +
-            Math.pow(player.y - wolf.y, 2)
-          );
-          if (dist < 100) {
-            wolf.hp -= player.dmg;
-            if (wolf.hp <= 0) {
-              games[roomCode].status = 'over';
-              games[roomCode].endReason = 'Wolf defeated!';
+        games[roomCode].wolves.forEach(wolf => {
+          if (wolf.hp > 0) {
+            const dist = Math.sqrt(
+              Math.pow(player.x - wolf.x, 2) +
+              Math.pow(player.y - wolf.y, 2)
+            );
+            if (dist < 100) {
+              wolf.hp -= player.dmg;
+              if (wolf.hp <= 0) {
+                checkWaveCompletion(games[roomCode], roomCode);
+              }
             }
           }
-        }
+        });
         break;
         
       case 'loot':
@@ -940,9 +1153,30 @@ io.on('connection', (socket) => {
           const item = player.inventory[index];
           player.inventory.splice(index, 1);
           if (item.type === 'hp') {
-            player.hp = Math.min(100, player.hp + item.val);
-          } else if (item.type === 'dmg') {
+            player.hp = Math.min(player.maxHp, player.hp + item.val);
+          } else if (item.type === 'dmg' || item.type === 'sword') {
             player.dmg += item.val;
+          } else if (item.type === 'shield') {
+            player.maxHp += item.val;
+            player.hp += item.val;
+          } else if (item.type === 'curse_dmg') {
+            player.dmg = Math.max(1, player.dmg + item.val);
+          } else if (item.type === 'hp_half') {
+            player.hp = Math.floor(player.hp * item.val);
+          } else if (item.type === 'hp_loss') {
+            player.hp += item.val;
+          } else if (item.type === 'potion') {
+            // Summon dog
+            player.companion = {
+              active: true,
+              x: player.x,
+              y: player.y,
+              hp: 100 + (games[roomCode].currentDay * 10),
+              maxHp: 100 + (games[roomCode].currentDay * 10),
+              dmg: 15 + games[roomCode].currentDay,
+              level: 1,
+              cooldown: 0
+            };
           }
         }
         break;
@@ -988,41 +1222,81 @@ io.on('connection', (socket) => {
 // Global game loop ticking state data back down to clients at 20fps
 setInterval(() => {
   for (const roomCode in games) {
+    const gameState = games[roomCode];
+    if (!gameState || gameState.status !== 'playing') continue;
+    
     // Update timer
-    if (games[roomCode].timer > 0) {
-      games[roomCode].timer -= 1;
+    if (gameState.timer > 0) {
+      gameState.timer -= 1;
+    } else if (gameState.phase === 'collection') {
+      // Timer ended - switch to chase phase
+      gameState.phase = 'chase';
+      io.to(roomCode).emit('systemMessage', 'The hunt begins!');
     }
     
-    // Simple wolf AI - move towards nearest player
-    if (games[roomCode].wolf && games[roomCode].wolf.hp > 0) {
-      let nearestPlayer = null;
-      let nearestDist = Infinity;
-      
-      Object.values(games[roomCode].players).forEach(player => {
-        if (!player.alive) return;
-        const dist = Math.sqrt(
-          Math.pow(player.x - games[roomCode].wolf.x, 2) +
-          Math.pow(player.y - games[roomCode].wolf.y, 2)
-        );
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestPlayer = player;
+    // Wolf AI - move towards nearest player
+    if (gameState.phase === 'chase') {
+      gameState.wolves.forEach(wolf => {
+        if (wolf.hp <= 0) return;
+        
+        let nearestPlayer = null;
+        let nearestDist = Infinity;
+        
+        Object.values(gameState.players).forEach(player => {
+          if (!player.alive) return;
+          const dist = Math.sqrt(
+            Math.pow(player.x - wolf.x, 2) +
+            Math.pow(player.y - wolf.y, 2)
+          );
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestPlayer = player;
+          }
+        });
+        
+        if (nearestPlayer) {
+          const dx = nearestPlayer.x - wolf.x;
+          const dy = nearestPlayer.y - wolf.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > 0) {
+            wolf.x += (dx / dist) * 2;
+            wolf.y += (dy / dist) * 2;
+          }
+          
+          // Damage player if close
+          if (dist < 35) {
+            nearestPlayer.hp -= wolf.dmg;
+            if (nearestPlayer.hp <= 0) {
+              nearestPlayer.hp = 0;
+              nearestPlayer.alive = false;
+              io.to(roomCode).emit('systemMessage', `${nearestPlayer.username} was killed by a wolf!`);
+            }
+          }
         }
       });
       
-      if (nearestPlayer) {
-        const dx = nearestPlayer.x - games[roomCode].wolf.x;
-        const dy = nearestPlayer.y - games[roomCode].wolf.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist > 0) {
-          games[roomCode].wolf.x += (dx / dist) * 2;
-          games[roomCode].wolf.y += (dy / dist) * 2;
-        }
-      }
+      // Handle companion AI
+      handleCompanionAI(gameState);
+      
+      // Check wave completion
+      checkWaveCompletion(gameState, roomCode);
+    } else if (gameState.phase === 'collection') {
+      // Handle companion AI during collection phase (dogs follow players)
+      handleCompanionAI(gameState);
     }
     
-    io.to(roomCode).emit('gameStateUpdate', games[roomCode]);
+    // Check if all players are dead
+    const alivePlayers = Object.values(gameState.players).filter(p => p.alive);
+    if (alivePlayers.length === 0) {
+      gameState.status = 'over';
+      gameState.endReason = 'All players have fallen.';
+      
+      // Save records for all players
+      savePlayerRecords(gameState, roomCode);
+    }
+    
+    io.to(roomCode).emit('gameStateUpdate', gameState);
   }
 }, 50);
 

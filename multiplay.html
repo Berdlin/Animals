@@ -117,12 +117,13 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 40px;
+            gap: 15px;
             z-index: 50;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px 30px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
             border-radius: 30px;
             border: 1px solid #333;
+            white-space: nowrap;
             pointer-events: none;
         }
 
@@ -556,6 +557,168 @@
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(1.5); opacity: 0; }
         }
+
+        /* --- MINIMAP (Top Right) --- */
+        #minimap-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #555;
+            z-index: 180;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            #minimap-container {
+                width: 80px;
+                height: 80px;
+                top: 10px;
+                right: 10px;
+            }
+        }
+
+        .mm-dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .mm-player {
+            background-color: #ff4500;
+            width: 6px;
+            height: 6px;
+            z-index: 2;
+            border: 1px solid white;
+        }
+
+        .mm-wolf {
+            background-color: #f00;
+        }
+
+        .mm-chest {
+            background-color: #ffd700;
+        }
+
+        .mm-dog {
+            background-color: #00bfff;
+        }
+
+        /* --- COMPANION MODAL --- */
+        #dogStatsModal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background: rgba(10, 15, 30, 0.95);
+            border: 2px solid #00bfff;
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            z-index: 150;
+            display: none;
+            box-shadow: 0 0 20px rgba(0, 191, 255, 0.3);
+        }
+
+        #dogStatsContent {
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding-right: 5px;
+        }
+
+        #dogStatsContent::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        #dogStatsContent::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        #dogStatsContent::-webkit-scrollbar-thumb {
+            background: #00bfff;
+            border-radius: 3px;
+        }
+
+        .close-modal-btn {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #ff4500;
+            font-size: 1.5em;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .dog-stat-row {
+            border-bottom: 1px solid #444;
+            padding: 10px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Game Over Record Elements */
+        #newRecordMsg {
+            color: #00ff00;
+            font-size: 1.5em;
+            margin-top: 10px;
+            font-weight: bold;
+            animation: pulseRecord 1s infinite;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        @keyframes pulseRecord {
+            0% {
+                opacity: 0.5;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+
+            100% {
+                opacity: 0.5;
+                transform: scale(1);
+            }
+        }
+
+        .record-celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4em;
+            z-index: 300;
+            animation: celebrate 2s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes celebrate {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.5) translateY(-100px);
+            }
+        }
     </style>
 </head>
 
@@ -566,9 +729,10 @@
     </div>
 
     <div class="hud-top">
-        <div class="hud-stat">TIME: <span id="timeStat">...</span></div>
+        <div class="hud-stat">DAY: <span id="levelDisplay">1</span></div>
         <div class="hud-stat">HP: <span id="hpStat">...</span></div>
         <div class="hud-stat">DMG: <span id="dmgStat">...</span></div>
+        <div class="hud-stat">TIME: <span id="timeStat">...</span></div>
     </div>
 
     <div id="voice-controls">
@@ -596,6 +760,7 @@
 
     <div class="game-wrapper">
         <div class="game-stage">
+            <div id="minimap-container"></div>
             <div id="mapViewport">
                 <div id="wolfIcon" class="icon" style="display:none;">🐺</div>
                 <div id="playersLayer"></div>
@@ -619,9 +784,18 @@
         </div>
     </div>
 
+    <div id="dogStatsModal">
+        <button class="close-modal-btn" onclick="toggleDogStats()">X</button>
+        <h2 style="text-align:center; margin-top:0; color:#00bfff;">Companion Pack</h2>
+        <div id="dogStatsContent"></div>
+        <p style="text-align:center; font-size:0.8em; color:#888;">Press 'O' or 🐕 to close</p>
+    </div>
+
     <div id="gameOverOverlay" style="display: none;">
         <h1 id="endTitle" style="color:white; font-size:3em;">GAME OVER</h1>
-        <p id="endReason" style="color:#aaa; font-size:1.5em;"></p>
+        <h2 id="daysSurvivedText" style="color: #ffaa00; font-family: 'Courier New', monospace; margin: 0;"></h2>
+        <div id="newRecordMsg"></div>
+        <p id="endReason" style="color:#aaa; font-size:1.5em; margin-bottom: 30px;"></p>
         <a href="index.html" style="color:#ff4500; font-size:1.2em; margin-top:20px;">Return to Intro</a>
     </div>
 
@@ -637,6 +811,14 @@
         const joyKnob = document.getElementById('joystickKnob');
         const socket = io();
         const getEl = (id) => document.getElementById(id);
+
+        // Client-side prediction variables
+        let localX = 750;
+        let localY = 750;
+        let serverX = 750;
+        let serverY = 750;
+        const PLAYER_SPEED = 8;
+        const RECONCILIATION_THRESHOLD = 50;
 
         // Voice Chat Variables
         let localStream = null;
@@ -703,6 +885,21 @@
                 getEl('storyText').style.opacity = '0'; initialMessageCleared = true; gameActive = true;
             }
             if (state.status !== 'over' && state.status !== 'lobby') gameActive = true;
+            
+            // Server reconciliation for client-side prediction
+            const myPlayer = state.players[myId];
+            if (myPlayer) {
+                serverX = myPlayer.x;
+                serverY = myPlayer.y;
+                
+                // Reconcile if drift is too large
+                const drift = Math.sqrt(Math.pow(localX - serverX, 2) + Math.pow(localY - serverY, 2));
+                if (drift > RECONCILIATION_THRESHOLD) {
+                    localX = serverX;
+                    localY = serverY;
+                }
+            }
+            
             renderGameState(state);
             if (state.status === 'over') endGame(state.players[myId]?.alive, state.endReason);
         });
@@ -778,7 +975,42 @@
                 if (len > 0) sendActionToServer('move', { dx: dx / len, dy: dy / len });
             } else { sendActionToServer('stopMove'); }
         }
+
+        // Local render loop for client-side prediction
+        function localRenderLoop() {
+            if (!gameActive) {
+                requestAnimationFrame(localRenderLoop);
+                return;
+            }
+
+            let dx = 0, dy = 0;
+            if (keyStates['w']) dy--; if (keyStates['s']) dy++;
+            if (keyStates['a']) dx--; if (keyStates['d']) dx++;
+            if (joyActive) { dx = joyData.x; dy = joyData.y; }
+
+            if (dx || dy) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                const speedMod = joyActive ? len : 1;
+                localX += (dx / len) * PLAYER_SPEED * speedMod * 0.05;
+                localY += (dy / len) * PLAYER_SPEED * speedMod * 0.05;
+            }
+
+            // Map boundaries
+            localX = Math.max(0, Math.min(localX, 1500));
+            localY = Math.max(0, Math.min(localY, 1500));
+
+            // Update local player position instantly
+            const myPlayerEl = getEl('player-' + myId);
+            if (myPlayerEl) {
+                myPlayerEl.style.left = localX + 'px';
+                myPlayerEl.style.top = localY + 'px';
+            }
+
+            requestAnimationFrame(localRenderLoop);
+        }
+
         setInterval(checkAndSendMovement, 50);
+        requestAnimationFrame(localRenderLoop);
 
         function handleDown(e) {
             const k = e.key.toLowerCase();
@@ -789,6 +1021,7 @@
             if (k === 'e') sendActionToServer('loot');
             if (k === ' ') sendActionToServer('attack');
             if (k === 'q' || k === 'alt') toggleInventory();
+            if (k === 'o') toggleDogStats();
             if (k >= '1' && k <= '9') sendActionToServer('useItem', { index: parseInt(k) - 1 });
         }
 
@@ -826,21 +1059,20 @@
         function renderGameState(state) {
             const myPlayer = state.players[myId];
             if (myPlayer) {
-                getEl('timeStat').textContent = state.timer > 0 ? state.timer : 'FIGHT';
+                getEl('timeStat').textContent = state.timer > 0 ? state.timer : (state.phase === 'collection' ? 'LOOT' : 'HUNT');
                 getEl('hpStat').textContent = myPlayer.alive ? myPlayer.hp : 'DEAD';
                 getEl('dmgStat').textContent = myPlayer.dmg;
+                getEl('levelDisplay').textContent = state.currentDay || 1;
                 renderInventory(myPlayer);
             }
             renderPlayers(state.players);
-            const wolf = getEl('wolfIcon');
-            if ((state.status === 'chase' || state.status === 'battle') && state.wolf && state.wolf.hp > 0) {
-                wolf.style.display = 'flex'; wolf.style.left = state.wolf.x + 'px'; wolf.style.top = state.wolf.y + 'px';
-            } else { wolf.style.display = 'none'; }
+            updateMinimap(state);
+            renderWolves(state.wolves, state.phase);
             const chestCont = getEl('mapItems'); chestCont.innerHTML = '';
             state.chests.forEach((c, i) => {
                 if (c.opened) return;
                 const el = document.createElement('div'); el.className = 'icon chest';
-                if (c.reward.type.includes('bad')) el.classList.add('chest-bad');
+                if (c.reward.type.includes('curse') || c.reward.type.includes('hp_loss') || c.reward.type.includes('hp_half')) el.classList.add('chest-bad');
                 el.textContent = '📦'; el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
                 chestCont.appendChild(el);
             });
@@ -859,7 +1091,10 @@
                     const comp = document.createElement('div'); comp.id = 'comp-' + id; comp.className = 'icon friendlyWolfIcon'; comp.textContent = '🐕';
                     el.appendChild(comp); layer.appendChild(el);
                 }
-                el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+                // Don't update local player position - it's handled by client-side prediction
+                if (id !== myId) {
+                    el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+                }
                 const comp = getEl('comp-' + id); comp.style.display = p.companion.active ? 'flex' : 'none';
             }
             Array.from(layer.children).forEach(el => { if (!activeIds.has(el.id.replace('player-', ''))) el.remove(); });
@@ -876,11 +1111,82 @@
         }
 
         function toggleInventory() { getEl('inventory-sidebar').classList.toggle('visible'); }
+
+        function toggleDogStats() {
+            const modal = getEl('dogStatsModal');
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+            const content = getEl('dogStatsContent');
+            content.innerHTML = '<div style="text-align:center; padding:20px;">No dogs active.</div>';
+        }
+
+        function renderWolves(wolves, phase) {
+            const wolfIcon = getEl('wolfIcon');
+            // For now, just show the first alive wolf or hide if none
+            const aliveWolf = wolves.find(w => w.hp > 0);
+            if (phase === 'chase' && aliveWolf) {
+                wolfIcon.style.display = 'flex';
+                wolfIcon.style.left = aliveWolf.x + 'px';
+                wolfIcon.style.top = aliveWolf.y + 'px';
+            } else {
+                wolfIcon.style.display = 'none';
+            }
+        }
+
+        function updateMinimap(state) {
+            const mm = getEl('minimap-container');
+            const scale = mm.clientWidth / 1500;
+            mm.innerHTML = '';
+
+            const myPlayer = state.players[myId];
+            if (myPlayer && myPlayer.alive) {
+                const pDot = document.createElement('div');
+                pDot.className = 'mm-dot mm-player';
+                pDot.style.left = (myPlayer.x * scale) + 'px';
+                pDot.style.top = (myPlayer.y * scale) + 'px';
+                mm.appendChild(pDot);
+            }
+
+            state.chests.forEach(c => {
+                if (!c.opened) {
+                    const cDot = document.createElement('div');
+                    cDot.className = 'mm-dot mm-chest';
+                    cDot.style.left = (c.x * scale) + 'px';
+                    cDot.style.top = (c.y * scale) + 'px';
+                    mm.appendChild(cDot);
+                }
+            });
+
+            // Show all alive wolves on minimap
+            if (state.wolves) {
+                state.wolves.forEach(wolf => {
+                    if (wolf.hp > 0) {
+                        const wDot = document.createElement('div');
+                        wDot.className = 'mm-dot mm-wolf';
+                        wDot.style.left = (wolf.x * scale) + 'px';
+                        wDot.style.top = (wolf.y * scale) + 'px';
+                        mm.appendChild(wDot);
+                    }
+                });
+            }
+
+            // Show companion dots for all players
+            for (const id in state.players) {
+                const p = state.players[id];
+                if (p.companion && p.companion.active) {
+                    const dDot = document.createElement('div');
+                    dDot.className = 'mm-dot mm-dog';
+                    dDot.style.left = (p.x * scale) + 'px';
+                    dDot.style.top = (p.y * scale) + 'px';
+                    mm.appendChild(dDot);
+                }
+            }
+        }
         function msg(txt) { const t = getEl('storyText'); t.innerText = txt; t.style.opacity = 1; setTimeout(() => { if (initialMessageCleared) t.style.opacity = 0; }, 3000); }
         function endGame(win, reason) {
             getEl('gameOverOverlay').style.display = 'flex';
             getEl('endTitle').textContent = win ? "VICTORY" : "DEFEAT";
             getEl('endReason').textContent = reason;
+            getEl('daysSurvivedText').textContent = `Day ${getEl('levelDisplay').textContent}`;
             gameActive = false;
         }
 
