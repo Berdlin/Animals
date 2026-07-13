@@ -13,8 +13,8 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? ['https://yourdomain.com'] : '*',
-    credentials: true
+    origin: "*", // Allows connections from any origin, including your ngrok domain
+    methods: ["GET", "POST"]
   }
 });
 
@@ -347,9 +347,10 @@ function generateRoomCode() {
 // Create multiplayer room
 app.post('/api/multiplayer/create-room', async (req, res) => {
   try {
-    const { host_id, host_name, max_players = 4 } = req.body;
+    const { host_id, host_name, max_players = 4, room_name } = req.body;
     
     const sanitizedName = sanitizeInput(host_name);
+    const sanitizedRoomName = room_name ? sanitizeInput(room_name) : null;
     if (!sanitizedName || !host_id) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -368,7 +369,7 @@ app.post('/api/multiplayer/create-room', async (req, res) => {
         codeExists = existingRoom.rows.length > 0;
       }
 
-      // Create room
+      // Create room (room_name stored in memory only, not in DB)
       const roomResult = await pool.query(
         'INSERT INTO multiplayer_rooms (room_code, host_id, host_name, max_players) VALUES ($1, $2, $3, $4) RETURNING id',
         [roomCode, host_id, sanitizedName, max_players]
@@ -392,6 +393,7 @@ app.post('/api/multiplayer/create-room', async (req, res) => {
         success: true, 
         room_code: roomCode, 
         room_id: roomId,
+        room_name: sanitizedRoomName,
         message: 'Room created successfully' 
       });
     });
@@ -527,28 +529,117 @@ app.post('/api/multiplayer/update-state', async (req, res) => {
 
 // Socket.IO multiplayer handling
 const rooms = new Map(); // In-memory room state for real-time updates
+const gameLoops = new Map(); // Store game loop intervals
+
+// Game loop function
+function startGameLoop(roomCode) {
+  if (gameLoops.has(roomCode)) return;
+  
+  const interval = setInterval(() => {
+    const room = rooms.get(roomCode);
+    if (!room || room.status !== 'playing') {
+      clearInterval(interval);
+      gameLoops.delete(roomCode);
+      return;
+    }
+    
+    // Update timer
+    if (room.gameState.timer > 0) {
+      room.gameState.timer -= 1;
+    }
+    
+    // Simple wolf AI - move towards nearest player
+    if (room.gameState.wolf && room.gameState.wolf.hp > 0) {
+      let nearestPlayer = null;
+      let nearestDist = Infinity;
+      
+      Object.values(room.gameState.players).forEach(player => {
+        if (!player.alive) return;
+        const dist = Math.sqrt(
+          Math.pow(player.x - room.gameState.wolf.x, 2) +
+          Math.pow(player.y - room.gameState.wolf.y, 2)
+        );
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestPlayer = player;
+        }
+      });
+      
+      if (nearestPlayer) {
+        const dx = nearestPlayer.x - room.gameState.wolf.x;
+        const dy = nearestPlayer.y - room.gameState.wolf.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 0) {
+          room.gameState.wolf.x += (dx / dist) * 2;
+          room.gameState.wolf.y += (dy / dist) * 2;
+        }
+      }
+    }
+    
+    // Send game state update
+    io.to(roomCode).emit('gameStateUpdate', room.gameState);
+    
+  }, 1000); // Update every second
+  
+  gameLoops.set(roomCode, interval);
+}
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on('hostGame', async ({ username }) => {
+  socket.on('hostGame', async ({ username, roomName }) => {
     try {
-      const response = await fetch('http://localhost:3000/api/multiplayer/create-room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ host_id: socket.id, host_name: username })
-      });
-      const data = await response.json();
+      const sanitizedName = sanitizeInput(username);
+      const sanitizedRoomName = roomName ? sanitizeInput(roomName) : null;
       
-      if (data.success) {
-        socket.join(data.room_code);
-        rooms.set(data.room_code, {
-          host: socket.id,
-          players: [{ id: socket.id, name: username }],
-          status: 'waiting'
-        });
-        socket.emit('roomCreated', data.room_code);
+      if (!sanitizedName) {
+        socket.emit('joinFailed', 'Invalid username');
+        return;
       }
+
+      let roomCode;
+      let codeExists = true;
+      
+      // Generate unique room code
+      while (codeExists) {
+        roomCode = generateRoomCode();
+        const existingRoom = await pool.query(
+          'SELECT room_code FROM multiplayer_rooms WHERE room_code = $1',
+          [roomCode]
+        );
+        codeExists = existingRoom.rows.length > 0;
+      }
+
+      // Create room
+      const roomResult = await pool.query(
+        'INSERT INTO multiplayer_rooms (room_code, host_id, host_name, max_players) VALUES ($1, $2, $3, $4) RETURNING id',
+        [roomCode, socket.id, sanitizedName, 4]
+      );
+
+      const roomId = roomResult.rows[0].id;
+
+      // Add host as first player
+      await pool.query(
+        'INSERT INTO multiplayer_players (room_id, player_id, player_name, is_host) VALUES ($1, $2, $3, true)',
+        [roomId, socket.id, sanitizedName]
+      );
+
+      // Create initial game state
+      await pool.query(
+        'INSERT INTO multiplayer_game_states (room_id) VALUES ($1)',
+        [roomId]
+      );
+
+      socket.join(roomCode);
+      rooms.set(roomCode, {
+        host: socket.id,
+        players: [{ id: socket.id, name: username }],
+        status: 'waiting',
+        room_name: roomName
+      });
+      socket.emit('roomCreated', { room_code: roomCode, room_name: roomName });
+      console.log('Room created with code:', roomCode);
     } catch (error) {
       console.error('Error hosting game:', error);
       socket.emit('joinFailed', 'Failed to create room');
@@ -557,24 +648,66 @@ io.on('connection', (socket) => {
 
   socket.on('joinGame', async (roomCode, { username }) => {
     try {
-      const response = await fetch('http://localhost:3000/api/multiplayer/join-room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_code: roomCode, player_id: socket.id, player_name: username })
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        socket.join(roomCode);
-        const room = rooms.get(roomCode);
-        if (room) {
-          room.players.push({ id: socket.id, name: username });
-          io.to(roomCode).emit('lobbyUpdate', room.players.map(p => p.name));
-        }
-        socket.emit('joinSuccess', roomCode);
-      } else {
-        socket.emit('joinFailed', data.error || 'Failed to join room');
+      const sanitizedName = sanitizeInput(username);
+      if (!sanitizedName || !roomCode) {
+        socket.emit('joinFailed', 'Missing required fields');
+        return;
       }
+
+      // Check if room exists and is waiting
+      const roomResult = await pool.query(
+        'SELECT id, status, max_players FROM multiplayer_rooms WHERE room_code = $1',
+        [roomCode]
+      );
+
+      if (roomResult.rows.length === 0) {
+        socket.emit('joinFailed', 'Room not found');
+        return;
+      }
+
+      const room = roomResult.rows[0];
+      if (room.status !== 'waiting') {
+        socket.emit('joinFailed', 'Room is not accepting players');
+        return;
+      }
+
+      // Check current player count
+      const playerCountResult = await pool.query(
+        'SELECT COUNT(*) as count FROM multiplayer_players WHERE room_id = $1',
+        [room.id]
+      );
+
+      if (parseInt(playerCountResult.rows[0].count) >= room.max_players) {
+        socket.emit('joinFailed', 'Room is full');
+        return;
+      }
+
+      // Check if player already in room
+      const existingPlayer = await pool.query(
+        'SELECT id FROM multiplayer_players WHERE room_id = $1 AND player_id = $2',
+        [room.id, socket.id]
+      );
+
+      if (existingPlayer.rows.length > 0) {
+        socket.emit('joinFailed', 'Already in this room');
+        return;
+      }
+
+      // Add player to room
+      await pool.query(
+        'INSERT INTO multiplayer_players (room_id, player_id, player_name) VALUES ($1, $2, $3)',
+        [room.id, socket.id, sanitizedName]
+      );
+
+      socket.join(roomCode);
+      const memoryRoom = rooms.get(roomCode);
+      if (memoryRoom) {
+        memoryRoom.players.push({ id: socket.id, name: username });
+        io.to(roomCode).emit('lobbyUpdate', memoryRoom.players.map(p => p.name));
+        // Notify existing players about new joiner for voice chat
+        socket.to(roomCode).emit('userJoined', socket.id);
+      }
+      socket.emit('joinSuccess', { room_code: roomCode, room_name: memoryRoom?.room_name });
     } catch (error) {
       console.error('Error joining game:', error);
       socket.emit('joinFailed', 'Failed to join room');
@@ -586,13 +719,51 @@ io.on('connection', (socket) => {
     for (const [roomCode, room] of rooms.entries()) {
       if (room.host === socket.id) {
         try {
-          await fetch('http://localhost:3000/api/multiplayer/start-game', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ room_code: roomCode })
-          });
+          await pool.query(
+            'UPDATE multiplayer_rooms SET status = $1, started_at = CURRENT_TIMESTAMP WHERE room_code = $2',
+            ['playing', roomCode]
+          );
           room.status = 'playing';
+          
+          // Initialize game state
+          room.gameState = {
+            status: 'playing',
+            timer: 60,
+            players: {},
+            wolf: { x: 750, y: 750, hp: 100 },
+            chests: []
+          };
+          
+          // Initialize players
+          room.players.forEach(player => {
+            room.gameState.players[player.id] = {
+              x: 750 + Math.random() * 200 - 100,
+              y: 750 + Math.random() * 200 - 100,
+              hp: 100,
+              dmg: 10,
+              alive: true,
+              username: player.name,
+              inventory: [],
+              companion: { active: false }
+            };
+          });
+          
+          // Spawn chests
+          for (let i = 0; i < 12; i++) {
+            room.gameState.chests.push({
+              x: Math.random() * 1400 + 50,
+              y: Math.random() * 1400 + 50,
+              opened: false,
+              reward: { name: 'Health Kit', type: 'hp', val: 20, icon: '🍷' }
+            });
+          }
+          
           io.to(roomCode).emit('gameStarted');
+          io.to(roomCode).emit('gameStateUpdate', room.gameState);
+          
+          // Start game loop
+          startGameLoop(roomCode);
+          
         } catch (error) {
           console.error('Error starting game:', error);
         }
@@ -602,21 +773,161 @@ io.on('connection', (socket) => {
   });
 
   socket.on('rejoinRoom', (roomCode, username) => {
+    console.log('Rejoin room request:', { roomCode, username, socketId: socket.id });
     socket.join(roomCode);
     const room = rooms.get(roomCode);
     if (room) {
+      // Add player to room if not already there
+      if (!room.players.some(p => p.id === socket.id)) {
+        room.players.push({ id: socket.id, name: username });
+      }
       socket.emit('lobbyUpdate', room.players.map(p => p.name));
+      
+      // Send appropriate state based on room status
+      if (room.gameState) {
+        io.to(roomCode).emit('gameStateUpdate', room.gameState);
+      } else {
+        // Send lobby state if game hasn't started
+        io.to(roomCode).emit('gameStateUpdate', { status: 'lobby', players: {} });
+      }
+      console.log('Successfully rejoined room:', roomCode);
+    } else {
+      console.error('Room not found for rejoin:', roomCode);
+      socket.emit('joinFailed', 'Room not found');
+    }
+  });
+
+  // Chat System
+  socket.on('chatMessage', (data) => {
+    const { message, sender } = data;
+    console.log('Chat message received:', { message, sender, socketId: socket.id });
+    
+    // Find room and broadcast
+    for (const [roomCode, room] of rooms.entries()) {
+      if (room.players.some(p => p.id === socket.id)) {
+        console.log('Broadcasting chat to room:', roomCode);
+        io.to(roomCode).emit('chatMessage', { message, sender, senderId: socket.id });
+        break;
+      }
+    }
+    
+    // If not found in any room, log error
+    console.log('Socket not found in any room for chat message');
+  });
+
+  // Voice Chat Signaling
+  socket.on('voiceSignal', (data) => {
+    const { signal, receiverId } = data;
+    // Relay signal to specific peer
+    io.to(receiverId).emit('voiceSignal', { signal, senderId: socket.id });
+  });
+
+  socket.on('voiceEnabled', (userId) => {
+    // Notify room that user enabled voice
+    for (const [roomCode, room] of rooms.entries()) {
+      if (room.players.some(p => p.id === socket.id)) {
+        socket.to(roomCode).emit('voiceEnabled', userId);
+        break;
+      }
+    }
+  });
+
+  socket.on('voiceDisabled', (userId) => {
+    // Notify room that user disabled voice
+    for (const [roomCode, room] of rooms.entries()) {
+      if (room.players.some(p => p.id === socket.id)) {
+        socket.to(roomCode).emit('voiceDisabled', userId);
+        break;
+      }
+    }
+  });
+
+  socket.on('getVoicePeers', () => {
+    // Return list of players in room with voice enabled
+    for (const [roomCode, room] of rooms.entries()) {
+      if (room.players.some(p => p.id === socket.id)) {
+        const voicePeers = room.players
+          .filter(p => p.id !== socket.id)
+          .map(p => p.id);
+        socket.emit('voicePeers', voicePeers);
+        break;
+      }
     }
   });
 
   socket.on('playerAction', (data) => {
-    // Broadcast player actions to room
+    const { type, data: actionData } = data;
+    
+    // Find room and update game state
     for (const [roomCode, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id)) {
-        socket.to(roomCode).emit('playerAction', {
-          playerId: socket.id,
-          ...data
-        });
+      if (room.players.some(p => p.id === socket.id) && room.gameState) {
+        const player = room.gameState.players[socket.id];
+        
+        if (!player || !player.alive) return;
+        
+        switch (type) {
+          case 'move':
+            const { dx, dy } = actionData;
+            const speed = 5;
+            player.x = Math.max(20, Math.min(1480, player.x + dx * speed));
+            player.y = Math.max(20, Math.min(1480, player.y + dy * speed));
+            break;
+            
+          case 'attack':
+            // Check if near wolf
+            const wolf = room.gameState.wolf;
+            if (wolf && wolf.hp > 0) {
+              const dist = Math.sqrt(
+                Math.pow(player.x - wolf.x, 2) +
+                Math.pow(player.y - wolf.y, 2)
+              );
+              if (dist < 100) {
+                wolf.hp -= player.dmg;
+                if (wolf.hp <= 0) {
+                  room.gameState.status = 'over';
+                  room.gameState.endReason = 'Wolf defeated!';
+                }
+              }
+            }
+            break;
+            
+          case 'loot':
+            // Check if near chest
+            room.gameState.chests.forEach(chest => {
+              if (chest.opened) return;
+              const dist = Math.sqrt(
+                Math.pow(player.x - chest.x, 2) +
+                Math.pow(player.y - chest.y, 2)
+              );
+              if (dist < 50) {
+                chest.opened = true;
+                if (chest.reward.type === 'hp') {
+                  player.hp = Math.min(100, player.hp + chest.reward.val);
+                } else if (chest.reward.type === 'dmg') {
+                  player.dmg += chest.reward.val;
+                }
+                player.inventory.push(chest.reward);
+              }
+            });
+            break;
+            
+          case 'useItem':
+            const { index } = actionData;
+            if (player.inventory[index]) {
+              const item = player.inventory[index];
+              player.inventory.splice(index, 1);
+              // Apply item effect
+              if (item.type === 'hp') {
+                player.hp = Math.min(100, player.hp + item.val);
+              } else if (item.type === 'dmg') {
+                player.dmg += item.val;
+              }
+            }
+            break;
+        }
+        
+        // Broadcast updated game state
+        io.to(roomCode).emit('gameStateUpdate', room.gameState);
         break;
       }
     }
@@ -630,12 +941,23 @@ io.on('connection', (socket) => {
       if (room.host === socket.id) {
         // Host left - notify all players
         io.to(roomCode).emit('hostLeft', 'Host has left the game');
-        rooms.delete(roomCode);
+        io.to(roomCode).emit('userLeft', socket.id); // Notify for voice chat
+        // TEMPORARILY DISABLED FOR DEBUGGING: rooms.delete(roomCode);
+        console.log('Room deletion disabled for debugging. Room code:', roomCode);
+        // Stop game loop
+        if (gameLoops.has(roomCode)) {
+          clearInterval(gameLoops.get(roomCode));
+          gameLoops.delete(roomCode);
+        }
         break;
       } else if (room.players.some(p => p.id === socket.id)) {
         // Player left
         room.players = room.players.filter(p => p.id !== socket.id);
+        if (room.gameState && room.gameState.players[socket.id]) {
+          delete room.gameState.players[socket.id];
+        }
         io.to(roomCode).emit('lobbyUpdate', room.players.map(p => p.name));
+        io.to(roomCode).emit('userLeft', socket.id); // Notify for voice chat
         break;
       }
     }

@@ -1,4 +1,10 @@
-const socket = io();
+// Replace with your exact ngrok URL from your terminal
+const NGROK_URL = "https://nongrievous-janeen-ineffectual.ngrok-free.dev";
+
+const socket = io(NGROK_URL, {
+  transports: ["websocket"], // CRITICAL: This bypasses the ngrok warning page
+  upgrade: false             // Prevents it from trying HTTP polling first
+});
 let isHost = false;
 let myId = null;
 
@@ -6,12 +12,28 @@ const getEl = (id) => document.getElementById(id);
 const connectionScreen = getEl('connection-screen');
 const lobbyScreen = getEl('lobby-screen');
 const usernameInput = getEl('usernameInput');
+const roomNameInput = getEl('roomNameInput');
 const displayCode = getEl('displayCode');
+const roomNameDisplay = getEl('roomNameDisplay');
 const playerList = getEl('playerList');
 const startButton = getEl('startButton');
 const errorMessage = getEl('error-message');
+const usernameDisplay = getEl('username-display');
 
-function getUsername() {
+async function getUsername() {
+    // Try to get authenticated username first
+    try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        if (data.authenticated && data.username) {
+            localStorage.setItem('gameUsername', data.username);
+            return data.username;
+        }
+    } catch (error) {
+        console.error('Session check error:', error);
+    }
+    
+    // Fall back to input or localStorage
     const name = usernameInput ? usernameInput.value.trim() : localStorage.getItem('gameUsername');
     if (!name) return 'Unnamed Hunter';
     localStorage.setItem('gameUsername', name);
@@ -20,16 +42,22 @@ function getUsername() {
 
 function displayError(msg) { errorMessage.textContent = msg; setTimeout(() => errorMessage.textContent = '', 5000); }
 
-function hostGame() {
-    const username = getUsername();
-    socket.emit('hostGame', { username });
+async function hostGame() {
+    const username = await getUsername();
+    const roomName = roomNameInput ? roomNameInput.value.trim() : '';
+    socket.emit('hostGame', { username, roomName });
 }
 
-function joinGame() {
-    const username = getUsername();
+async function joinGame() {
+    const username = await getUsername();
     const code = getEl('joinCode').value.trim();
     if (code.length !== 4) return displayError('Code must be 4 digits.');
     socket.emit('joinGame', code, { username });
+}
+
+function leaveRoom() {
+    localStorage.removeItem('gameRoomCode');
+    window.location.href = 'index.html';
 }
 
 function startGame() {
@@ -38,21 +66,47 @@ function startGame() {
 
 socket.on('connect', () => { myId = socket.id; });
 
-socket.on('roomCreated', (code) => {
-    isHost = true;
-    localStorage.setItem('gameRoomCode', code);
-    connectionScreen.style.display = 'none';
-    lobbyScreen.style.display = 'block';
-    displayCode.textContent = code;
-    startButton.style.display = 'block';
+// Load username on page load
+window.addEventListener('load', async () => {
+    try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        if (data.authenticated && data.username) {
+            usernameDisplay.textContent = `Playing as: ${data.username}`;
+        }
+    } catch (error) {
+        console.error('Session check error:', error);
+    }
 });
 
-socket.on('joinSuccess', (code) => {
+socket.on('roomCreated', (data) => {
+    console.log('Room created response:', data);
+    isHost = true;
+    if (data.room_code) {
+        localStorage.setItem('gameRoomCode', data.room_code);
+        console.log('Room code stored in localStorage:', data.room_code);
+        connectionScreen.style.display = 'none';
+        lobbyScreen.style.display = 'block';
+        displayCode.textContent = data.room_code;
+        if (data.room_name) {
+            roomNameDisplay.textContent = `Room: ${data.room_name}`;
+        }
+        startButton.style.display = 'block';
+    } else {
+        console.error('No room_code in response:', data);
+        displayError('Failed to create room - no code received');
+    }
+});
+
+socket.on('joinSuccess', (data) => {
     isHost = false;
-    localStorage.setItem('gameRoomCode', code);
+    localStorage.setItem('gameRoomCode', data.room_code);
     connectionScreen.style.display = 'none';
     lobbyScreen.style.display = 'block';
-    displayCode.textContent = code;
+    displayCode.textContent = data.room_code;
+    if (data.room_name) {
+        roomNameDisplay.textContent = `Room: ${data.room_name}`;
+    }
     startButton.style.display = 'none';
 });
 
@@ -67,5 +121,19 @@ socket.on('lobbyUpdate', (players) => {
     });
 });
 
-socket.on('gameStarted', () => { window.location.href = 'multiplay.html'; });
-socket.on('hostLeft', (msg) => { alert(msg); window.location.href = 'index.html'; });
+socket.on('gameStarted', () => { 
+    console.log('Game started, redirecting to multiplayer');
+    const roomCode = localStorage.getItem('gameRoomCode');
+    console.log('Room code before redirect:', roomCode);
+    if (!roomCode || roomCode === 'undefined') {
+        console.error('Invalid room code, cannot start game');
+        alert('Error: Invalid room code');
+        return;
+    }
+    window.location.href = 'multiplay.html'; 
+});
+socket.on('hostLeft', (msg) => { 
+    alert(msg); 
+    localStorage.removeItem('gameRoomCode');
+    window.location.href = 'index.html'; 
+});

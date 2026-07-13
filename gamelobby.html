@@ -57,7 +57,8 @@
     <div class="container">
         <h1>Lobby</h1>
         <div id="connection-screen">
-            <input type="text" id="usernameInput" placeholder="Enter Your Username" required>
+            <p id="username-display" style="color: #4CAF50; margin-bottom: 15px;"></p>
+            <input type="text" id="roomNameInput" placeholder="Room Name (optional)">
             <button onclick="hostGame()" class="btn">Host Game</button>
             <input type="text" id="joinCode" placeholder="Room Code">
             <button onclick="joinGame()" class="btn">Join Game</button>
@@ -65,9 +66,11 @@
         </div>
         <div id="lobby-screen" style="display: none;">
             <h2>Room: <span id="displayCode" style="color: #4CAF50;"></span></h2>
+            <p id="roomNameDisplay" style="color: #888; font-size: 0.9em;"></p>
             <ul id="playerList" style="text-align: left;"></ul>
             <button id="startButton" onclick="startGame()" class="btn"
                 style="display: none; background: #4CAF50;">Start</button>
+            <button onclick="leaveRoom()" class="btn" style="background: #ff4444; margin-top: 10px;">Leave</button>
         </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>

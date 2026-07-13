@@ -37,13 +37,18 @@
         }
 
         #mapViewport {
-            width: 600px;
-            height: 600px;
+            width: 1500px;
+            height: 1500px;
             background-color: #0c180f;
-            border: 2px solid #333;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 100px 100px;
+            border: 5px solid #222;
+            position: absolute;
+            top: 0;
+            left: 0;
+            will-change: transform;
         }
 
         .inventory-sidebar {
@@ -260,6 +265,12 @@
                 height: 100%;
                 border: none;
             }
+
+            #chat-container {
+                width: 280px;
+                bottom: 180px;
+                left: 10px;
+            }
         }
 
         #joystickZone {
@@ -340,6 +351,211 @@
             font-size: 0.8em;
             background: #333;
         }
+
+        /* Chat System */
+        #chat-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 320px;
+            max-height: 250px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #333;
+            border-radius: 8px;
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chat-header {
+            padding: 10px;
+            background: rgba(255, 69, 0, 0.2);
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+            user-select: none;
+        }
+
+        #chat-header h3 {
+            margin: 0;
+            font-size: 0.9em;
+            color: #ff4500;
+        }
+
+        #chat-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        #chat-minimize, #chat-close {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #chat-minimize:hover, #chat-close:hover {
+            background: #555;
+        }
+
+        #chat-container.minimized #chat-messages,
+        #chat-container.minimized #chat-input-container {
+            display: none;
+        }
+
+        #chat-container.minimized {
+            max-height: 45px;
+        }
+
+        #chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            min-height: 150px;
+            max-height: 180px;
+        }
+
+        .chat-message {
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            word-wrap: break-word;
+        }
+
+        .chat-message .sender {
+            color: #ff4500;
+            font-weight: bold;
+        }
+
+        .chat-message .text {
+            color: #ccc;
+        }
+
+        .chat-message.system {
+            color: #888;
+            font-style: italic;
+        }
+
+        #chat-input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #333;
+            gap: 5px;
+        }
+
+        #chat-input {
+            flex: 1;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+        }
+
+        #chat-input:focus {
+            outline: none;
+            border-color: #ff4500;
+        }
+
+        #chat-send {
+            padding: 8px 15px;
+            background: #ff4500;
+            border: none;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #chat-send:hover {
+            background: #ff6622;
+        }
+
+        /* Voice Chat */
+        #voice-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 160;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #voice-status {
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #voice-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+            transition: background 0.3s;
+        }
+
+        #voice-indicator.active {
+            background: #00ff00;
+            animation: pulse 1s infinite;
+        }
+
+        #voice-indicator.muted {
+            background: #ff0000;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        #voice-toggle {
+            padding: 10px 20px;
+            background: #333;
+            border: 1px solid #ff4500;
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        #voice-toggle:hover {
+            background: #ff4500;
+        }
+
+        #voice-toggle.muted {
+            background: #ff0000;
+            border-color: #ff0000;
+        }
+
+        .voice-speaking {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid #00ff00;
+            animation: speaking-pulse 0.5s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes speaking-pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
     </style>
 </head>
 
@@ -353,6 +569,29 @@
         <div class="hud-stat">TIME: <span id="timeStat">...</span></div>
         <div class="hud-stat">HP: <span id="hpStat">...</span></div>
         <div class="hud-stat">DMG: <span id="dmgStat">...</span></div>
+    </div>
+
+    <div id="voice-controls">
+        <div id="voice-status">
+            <div id="voice-indicator"></div>
+            <span id="voice-text">Voice: Off</span>
+        </div>
+        <button id="voice-toggle" onclick="toggleVoice()">Enable Voice</button>
+    </div>
+
+    <div id="chat-container">
+        <div id="chat-header">
+            <h3>Chat</h3>
+            <div id="chat-controls">
+                <button id="chat-minimize" onclick="toggleChatMinimize()">−</button>
+                <button id="chat-close" onclick="toggleChatVisibility()">×</button>
+            </div>
+        </div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Type a message..." maxlength="200">
+            <button id="chat-send" onclick="sendChatMessage()">Send</button>
+        </div>
     </div>
 
     <div class="game-wrapper">
@@ -399,18 +638,67 @@
         const socket = io();
         const getEl = (id) => document.getElementById(id);
 
+        // Voice Chat Variables
+        let localStream = null;
+        let peerConnections = {};
+        let voiceEnabled = false;
+        let isMuted = false;
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        let joinTimeout = null;
+
         socket.on('connect', () => {
             myId = socket.id;
             const roomCode = localStorage.getItem('gameRoomCode');
             const username = localStorage.getItem('gameUsername') || 'Player';
-            if (roomCode) { 
-                console.log(`Connected. Room: ${roomCode}`); 
+            console.log(`Connected. Room: ${roomCode}, Username: ${username}`);
+            
+            if (roomCode && roomCode !== 'undefined' && roomCode !== 'null') { 
                 socket.emit('rejoinRoom', roomCode, username);
+                getEl('storyText').textContent = 'Joining game...';
+                
+                // Set a timeout for connection
+                joinTimeout = setTimeout(() => {
+                    if (!gameActive && getEl('storyText').textContent === 'Joining game...') {
+                        console.error('Connection timeout');
+                        getEl('storyText').textContent = 'Connection failed. Retrying...';
+                        setTimeout(() => {
+                            if (!gameActive) {
+                                alert('Could not connect to game. Please try again.');
+                                window.location.href = 'index.html';
+                            }
+                        }, 3000);
+                    }
+                }, 10000);
+            } else { 
+                console.error('No valid room code found, redirecting to index');
+                alert('No room code found. Please join a room first.');
+                window.location.href = 'index.html'; 
             }
-            else { window.location.href = 'index.html'; }
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+            getEl('storyText').textContent = 'Connection error: ' + error.message;
+            setTimeout(() => {
+                alert('Connection failed. Please check your internet connection.');
+                window.location.href = 'index.html';
+            }, 2000);
         });
 
         socket.on('gameStateUpdate', (state) => {
+            // CRITICAL: Clear the timeout when gameStateUpdate is received
+            if (joinTimeout) {
+                clearTimeout(joinTimeout);
+                joinTimeout = null;
+            }
+            
             if (state.status !== 'lobby' && state.status !== 'over' && !initialMessageCleared) {
                 getEl('storyText').style.opacity = '0'; initialMessageCleared = true; gameActive = true;
             }
@@ -420,6 +708,62 @@
         });
 
         socket.on('hostLeft', (message) => endGame(false, message));
+
+        socket.on('joinFailed', (message) => {
+            console.error('Join failed:', message);
+            getEl('storyText').textContent = 'Join failed: ' + message;
+            setTimeout(() => {
+                alert('Could not join game: ' + message);
+                window.location.href = 'index.html';
+            }, 2000);
+        });
+
+        // Chat System
+        socket.on('chatMessage', (data) => {
+            addChatMessage(data.sender, data.message, false);
+        });
+
+        socket.on('systemMessage', (message) => {
+            addChatMessage('System', message, true);
+        });
+
+        // WebRTC Signaling
+        socket.on('voiceSignal', async (data) => {
+            const { signal, senderId } = data;
+            if (senderId === myId) return;
+
+            if (!peerConnections[senderId]) {
+                await createPeerConnection(senderId);
+            }
+
+            try {
+                if (signal.type === 'offer') {
+                    await peerConnections[senderId].setRemoteDescription(new RTCSessionDescription(signal));
+                    const answer = await peerConnections[senderId].createAnswer();
+                    await peerConnections[senderId].setLocalDescription(answer);
+                    socket.emit('voiceSignal', { signal: answer, receiverId: senderId });
+                } else if (signal.type === 'answer') {
+                    await peerConnections[senderId].setRemoteDescription(new RTCSessionDescription(signal));
+                } else if (signal.type === 'ice-candidate') {
+                    await peerConnections[senderId].addIceCandidate(new RTCIceCandidate(signal.candidate));
+                }
+            } catch (error) {
+                console.error('WebRTC signaling error:', error);
+            }
+        });
+
+        socket.on('userJoined', async (userId) => {
+            if (voiceEnabled && userId !== myId) {
+                await createPeerConnection(userId);
+            }
+        });
+
+        socket.on('userLeft', (userId) => {
+            if (peerConnections[userId]) {
+                peerConnections[userId].close();
+                delete peerConnections[userId];
+            }
+        });
 
         function sendActionToServer(type, data = {}) { if (gameActive) socket.emit('playerAction', { type, data }); }
 
@@ -539,6 +883,274 @@
             getEl('endReason').textContent = reason;
             gameActive = false;
         }
+
+        // Chat Functions
+        function addChatMessage(sender, message, isSystem = false) {
+            const chatMessages = getEl('chat-messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'chat-message' + (isSystem ? ' system' : '');
+            
+            if (isSystem) {
+                msgDiv.textContent = message;
+            } else {
+                msgDiv.innerHTML = `<span class="sender">${sender}:</span> <span class="text">${message}</span>`;
+            }
+            
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendChatMessage() {
+            const input = getEl('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            const username = localStorage.getItem('gameUsername') || 'Player';
+            console.log('Sending chat message:', { message, sender: username });
+            socket.emit('chatMessage', { message, sender: username });
+            input.value = '';
+        }
+
+        getEl('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+
+        // Chat Box Dragging and Minimizing
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        const chatContainer = getEl('chat-container');
+        const chatHeader = getEl('chat-header');
+
+        function toggleChatMinimize() {
+            chatContainer.classList.toggle('minimized');
+            const btn = getEl('chat-minimize');
+            btn.textContent = chatContainer.classList.contains('minimized') ? '+' : '−';
+        }
+
+        function toggleChatVisibility() {
+            chatContainer.style.display = chatContainer.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        // Desktop drag functionality
+        chatHeader.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'chat-minimize' || e.target.id === 'chat-close') return;
+            isDragging = true;
+            const rect = chatContainer.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const x = e.clientX - dragOffset.x;
+            const y = e.clientY - dragOffset.y;
+            chatContainer.style.left = x + 'px';
+            chatContainer.style.top = y + 'px';
+            chatContainer.style.bottom = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Mobile touch drag functionality
+        let touchStartX, touchStartY;
+
+        chatHeader.addEventListener('touchstart', (e) => {
+            if (e.target.id === 'chat-minimize' || e.target.id === 'chat-close') return;
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            const rect = chatContainer.getBoundingClientRect();
+            dragOffset.x = touch.clientX - rect.left;
+            dragOffset.y = touch.clientY - rect.top;
+            isDragging = true;
+        }, { passive: false });
+
+        chatHeader.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const x = touch.clientX - dragOffset.x;
+            const y = touch.clientY - dragOffset.y;
+            
+            // Keep within bounds
+            const maxX = window.innerWidth - chatContainer.offsetWidth;
+            const maxY = window.innerHeight - chatContainer.offsetHeight;
+            
+            chatContainer.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+            chatContainer.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+            chatContainer.style.bottom = 'auto';
+        }, { passive: false });
+
+        chatHeader.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        // Voice Chat Functions
+        async function toggleVoice() {
+            if (!voiceEnabled) {
+                await enableVoice();
+            } else {
+                disableVoice();
+            }
+        }
+
+        async function enableVoice() {
+            try {
+                const constraints = {
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        latency: 0,
+                        sampleRate: 48000,
+                        channelCount: 1
+                    }
+                };
+
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                voiceEnabled = true;
+                updateVoiceUI();
+                
+                // Notify others that voice is enabled
+                socket.emit('voiceEnabled', myId);
+                
+                // Create connections with existing players
+                socket.emit('getVoicePeers');
+                
+            } catch (error) {
+                console.error('Error enabling voice:', error);
+                addChatMessage('System', 'Could not access microphone', true);
+            }
+        }
+
+        function disableVoice() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            Object.values(peerConnections).forEach(pc => pc.close());
+            peerConnections = {};
+            voiceEnabled = false;
+            updateVoiceUI();
+            
+            socket.emit('voiceDisabled', myId);
+        }
+
+        function toggleMute() {
+            if (!localStream) return;
+            
+            isMuted = !isMuted;
+            localStream.getAudioTracks().forEach(track => {
+                track.enabled = !isMuted;
+            });
+            updateVoiceUI();
+        }
+
+        function updateVoiceUI() {
+            const indicator = getEl('voice-indicator');
+            const text = getEl('voice-text');
+            const toggle = getEl('voice-toggle');
+            
+            indicator.className = '';
+            toggle.className = '';
+            
+            if (!voiceEnabled) {
+                text.textContent = 'Voice: Off';
+                toggle.textContent = 'Enable Voice';
+                indicator.classList.add('muted');
+            } else if (isMuted) {
+                text.textContent = 'Voice: Muted';
+                toggle.textContent = 'Unmute';
+                toggle.classList.add('muted');
+                indicator.classList.add('muted');
+            } else {
+                text.textContent = 'Voice: Active';
+                toggle.textContent = 'Mute';
+                indicator.classList.add('active');
+            }
+        }
+
+        async function createPeerConnection(targetUserId) {
+            const pc = new RTCPeerConnection(configuration);
+            
+            // Add local stream
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTrack(track, localStream);
+                });
+            }
+            
+            // Handle incoming stream
+            pc.ontrack = (event) => {
+                const remoteStream = event.streams[0];
+                const audio = new Audio();
+                audio.srcObject = remoteStream;
+                audio.autoplay = true;
+                audio.play();
+            };
+            
+            // Handle ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('voiceSignal', {
+                        signal: { type: 'ice-candidate', candidate: event.candidate },
+                        receiverId: targetUserId
+                    });
+                }
+            };
+            
+            // Handle connection state
+            pc.onconnectionstatechange = () => {
+                console.log('Connection state:', pc.connectionState);
+                if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                    pc.close();
+                    delete peerConnections[targetUserId];
+                }
+            };
+            
+            peerConnections[targetUserId] = pc;
+            
+            // Create and send offer
+            const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                voiceActivityDetection: false
+            });
+            await pc.setLocalDescription(offer);
+            
+            socket.emit('voiceSignal', {
+                signal: offer,
+                receiverId: targetUserId
+            });
+        }
+
+        // Handle voice enabled notifications
+        socket.on('voiceEnabled', async (userId) => {
+            if (voiceEnabled && userId !== myId) {
+                await createPeerConnection(userId);
+                addChatMessage('System', `${userId} joined voice chat`, true);
+            }
+        });
+
+        socket.on('voiceDisabled', (userId) => {
+            if (peerConnections[userId]) {
+                peerConnections[userId].close();
+                delete peerConnections[userId];
+                addChatMessage('System', `${userId} left voice chat`, true);
+            }
+        });
+
+        socket.on('voicePeers', async (peerIds) => {
+            if (voiceEnabled) {
+                for (const peerId of peerIds) {
+                    if (peerId !== myId && !peerConnections[peerId]) {
+                        await createPeerConnection(peerId);
+                    }
+                }
+            }
+        });
     </script>
 </body>
 
