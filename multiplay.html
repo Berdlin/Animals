@@ -215,6 +215,25 @@
             border-radius: 50%;
         }
 
+        /* Alerts */
+        #topAlertBox {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px 30px;
+            border-radius: 5px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 1.2em;
+            z-index: 150;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 2px solid #fff;
+        }
+
         #storyText {
             position: absolute;
             top: 80px;
@@ -762,12 +781,13 @@
         <div class="game-stage">
             <div id="minimap-container"></div>
             <div id="mapViewport">
-                <div id="wolfIcon" class="icon" style="display:none;">🐺</div>
+                <div id="wolvesLayer"></div>
                 <div id="playersLayer"></div>
                 <div id="mapItems"></div>
                 <div id="effectsLayer"></div>
             </div>
             <div id="storyText" style="opacity: 1;">Connecting...</div>
+            <div id="topAlertBox"></div>
 
             <div class="mobile-controls-layer">
                 <div id="joystickZone">
@@ -819,6 +839,12 @@
         let serverY = 750;
         const PLAYER_SPEED = 8;
         const RECONCILIATION_THRESHOLD = 50;
+        const MAP_SIZE = 1500;
+        let camera = { x: 0, y: 0 };
+
+        // Track previous state for change detection
+        let prevInventory = [];
+        let prevHp = 100;
 
         // Voice Chat Variables
         let localStream = null;
@@ -897,6 +923,37 @@
                 if (drift > RECONCILIATION_THRESHOLD) {
                     localX = serverX;
                     localY = serverY;
+                }
+
+                // Detect inventory changes and show alerts
+                if (myPlayer.inventory && myPlayer.inventory.length !== prevInventory.length) {
+                    const newItem = myPlayer.inventory[myPlayer.inventory.length - 1];
+                    if (newItem) {
+                        let alertColor = '#00ff00';
+                        let alertText = `Found ${newItem.icon} ${newItem.name}`;
+                        
+                        if (newItem.type.includes('curse') || newItem.type.includes('hp_loss') || newItem.type.includes('hp_half')) {
+                            alertColor = '#ff0000';
+                            alertText = `CURSED! ${newItem.icon} ${newItem.name}`;
+                        } else if (newItem.type === 'potion') {
+                            alertColor = '#00bfff';
+                            alertText = `${newItem.icon} Dog Summoned!`;
+                        }
+                        
+                        showAlert(alertText, alertColor);
+                    }
+                    prevInventory = [...myPlayer.inventory];
+                }
+
+                // Detect health changes
+                if (myPlayer.hp !== prevHp) {
+                    const hpDiff = myPlayer.hp - prevHp;
+                    if (hpDiff < 0) {
+                        showAlert(`-${Math.abs(hpDiff)} HP`, '#ff0000');
+                    } else if (hpDiff > 0) {
+                        showAlert(`+${hpDiff} HP`, '#00ff00');
+                    }
+                    prevHp = myPlayer.hp;
                 }
             }
             
@@ -1006,7 +1063,29 @@
                 myPlayerEl.style.top = localY + 'px';
             }
 
+            // Update camera to keep player centered
+            updateCamera();
+
             requestAnimationFrame(localRenderLoop);
+        }
+
+        function updateCamera() {
+            const stage = getEl('stage');
+            const viewport = getEl('mapViewport');
+            const centerX = stage.clientWidth / 2;
+            const centerY = stage.clientHeight / 2;
+            camera.x = centerX - localX;
+            camera.y = centerY - localY;
+            camera.x = Math.min(0, Math.max(camera.x, stage.clientWidth - MAP_SIZE));
+            camera.y = Math.min(0, Math.max(camera.y, stage.clientHeight - MAP_SIZE));
+
+            viewport.style.transform = `translate3d(${camera.x}px, ${camera.y}px, 0)`;
+        }
+
+        function showAlert(text, color) {
+            const el = getEl('topAlertBox');
+            el.innerText = text; el.style.borderColor = color; el.style.color = color; el.style.opacity = 1;
+            setTimeout(() => el.style.opacity = 0, 2000);
         }
 
         setInterval(checkAndSendMovement, 50);
@@ -1120,16 +1199,50 @@
         }
 
         function renderWolves(wolves, phase) {
-            const wolfIcon = getEl('wolfIcon');
-            // For now, just show the first alive wolf or hide if none
-            const aliveWolf = wolves.find(w => w.hp > 0);
-            if (phase === 'chase' && aliveWolf) {
-                wolfIcon.style.display = 'flex';
-                wolfIcon.style.left = aliveWolf.x + 'px';
-                wolfIcon.style.top = aliveWolf.y + 'px';
-            } else {
-                wolfIcon.style.display = 'none';
+            const wolvesLayer = getEl('wolvesLayer');
+            const activeWolfIds = new Set();
+            
+            if (phase === 'chase' && wolves) {
+                wolves.forEach(wolf => {
+                    if (wolf.hp <= 0) return;
+                    activeWolfIds.add(wolf.id);
+                    
+                    let wolfEl = getEl(`wolf-${wolf.id}`);
+                    if (!wolfEl) {
+                        wolfEl = document.createElement('div');
+                        wolfEl.className = 'icon';
+                        wolfEl.id = `wolf-${wolf.id}`;
+                        wolfEl.style.fontSize = '2.5em';
+                        wolfEl.style.width = '50px';
+                        wolfEl.style.height = '50px';
+                        wolfEl.style.display = 'flex';
+                        wolfEl.style.alignItems = 'center';
+                        wolfEl.style.justifyContent = 'center';
+                        wolfEl.style.position = 'absolute';
+                        wolfEl.style.zIndex = '9';
+                        wolfEl.innerHTML = `<div class="bar-container" style="position:absolute; top:-10px; left:0; width:100%; height:4px; background:#333;"><div class="bar-fill" id="wolf-hp-${wolf.id}" style="width: 100%; background:red;"></div></div>🐺`;
+                        wolvesLayer.appendChild(wolfEl);
+                    }
+                    
+                    wolfEl.style.display = 'flex';
+                    wolfEl.style.left = wolf.x + 'px';
+                    wolfEl.style.top = wolf.y + 'px';
+                    
+                    // Update HP bar
+                    const hpBar = getEl(`wolf-hp-${wolf.id}`);
+                    if (hpBar) {
+                        hpBar.style.width = (wolf.hp / wolf.maxHp * 100) + '%';
+                    }
+                });
             }
+            
+            // Hide wolves that are dead or not in chase phase
+            wolvesLayer.querySelectorAll('[id^="wolf-"]').forEach(el => {
+                const wolfId = parseInt(el.id.replace('wolf-', ''));
+                if (!activeWolfIds.has(wolfId)) {
+                    el.style.display = 'none';
+                }
+            });
         }
 
         function updateMinimap(state) {

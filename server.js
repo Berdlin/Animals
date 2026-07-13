@@ -713,6 +713,8 @@ async function savePlayerRecords(gameState, roomCode) {
 function startGameLoop(roomCode) {
   if (gameLoops.has(roomCode)) return;
   
+  let lastTimerUpdate = Date.now();
+  
   const interval = setInterval(() => {
     const gameState = games[roomCode];
     if (!gameState || gameState.status !== 'playing') {
@@ -721,10 +723,12 @@ function startGameLoop(roomCode) {
       return;
     }
     
-    // Update timer
-    if (gameState.timer > 0) {
+    // Update timer - only decrease by 1 every 1000ms
+    const now = Date.now();
+    if (gameState.timer > 0 && now - lastTimerUpdate >= 1000) {
       gameState.timer -= 1;
-    } else if (gameState.phase === 'collection') {
+      lastTimerUpdate = now;
+    } else if (gameState.timer <= 0 && gameState.phase === 'collection') {
       // Timer ended - switch to chase phase
       gameState.phase = 'chase';
       io.to(roomCode).emit('systemMessage', 'The hunt begins!');
@@ -1220,15 +1224,19 @@ io.on('connection', (socket) => {
 });
 
 // Global game loop ticking state data back down to clients at 20fps
+let globalLastTimerUpdate = Date.now();
+
 setInterval(() => {
   for (const roomCode in games) {
     const gameState = games[roomCode];
     if (!gameState || gameState.status !== 'playing') continue;
     
-    // Update timer
-    if (gameState.timer > 0) {
+    // Update timer - only decrease by 1 every 1000ms
+    const now = Date.now();
+    if (gameState.timer > 0 && now - globalLastTimerUpdate >= 1000) {
       gameState.timer -= 1;
-    } else if (gameState.phase === 'collection') {
+      globalLastTimerUpdate = now;
+    } else if (gameState.timer <= 0 && gameState.phase === 'collection') {
       // Timer ended - switch to chase phase
       gameState.phase = 'chase';
       io.to(roomCode).emit('systemMessage', 'The hunt begins!');
