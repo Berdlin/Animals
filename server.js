@@ -530,6 +530,7 @@ app.post('/api/multiplayer/update-state', async (req, res) => {
 // Socket.IO multiplayer handling
 const rooms = new Map(); // In-memory room state for real-time updates
 const gameLoops = new Map(); // Store game loop intervals
+const games = {}; // Global game state for multiplayer
 
 // Game loop function
 function startGameLoop(roomCode) {
@@ -775,26 +776,59 @@ io.on('connection', (socket) => {
   socket.on('rejoinRoom', (roomCode, username) => {
     console.log('Rejoin room request:', { roomCode, username, socketId: socket.id });
     socket.join(roomCode);
+    socket.roomCode = roomCode;
+    socket.username = username;
+
+    // Initialize game state container for this room if missing
+    if (!games[roomCode]) {
+      games[roomCode] = {
+        status: 'playing',
+        timer: 60,
+        players: {},
+        chests: [],
+        wolf: { x: 750, y: 750, hp: 100 }
+      };
+      
+      // Spawn chests
+      for (let i = 0; i < 12; i++) {
+        games[roomCode].chests.push({
+          x: Math.random() * 1400 + 50,
+          y: Math.random() * 1400 + 50,
+          opened: false,
+          reward: { name: 'Health Kit', type: 'hp', val: 20, icon: '🍷' }
+        });
+      }
+    }
+
+    // Add player to the live room structure if missing
+    if (!games[roomCode].players[socket.id]) {
+      games[roomCode].players[socket.id] = {
+        id: socket.id,
+        username: username,
+        x: 750 + Math.random() * 200 - 100,
+        y: 750 + Math.random() * 200 - 100,
+        hp: 100,
+        dmg: 10,
+        alive: true,
+        companion: { active: false },
+        inventory: []
+      };
+    }
+
+    // Update rooms Map for lobby compatibility
     const room = rooms.get(roomCode);
     if (room) {
-      // Add player to room if not already there
       if (!room.players.some(p => p.id === socket.id)) {
         room.players.push({ id: socket.id, name: username });
       }
       socket.emit('lobbyUpdate', room.players.map(p => p.name));
-      
-      // Send appropriate state based on room status
-      if (room.gameState) {
-        io.to(roomCode).emit('gameStateUpdate', room.gameState);
-      } else {
-        // Send lobby state if game hasn't started
-        io.to(roomCode).emit('gameStateUpdate', { status: 'lobby', players: {} });
-      }
-      console.log('Successfully rejoined room:', roomCode);
-    } else {
-      console.error('Room not found for rejoin:', roomCode);
-      socket.emit('joinFailed', 'Room not found');
     }
+
+    // Inform others in room about voice updates
+    socket.to(roomCode).emit('userJoined', socket.id);
+    io.to(roomCode).emit('systemMessage', `${username} joined the hunt.`);
+    
+    console.log('Successfully rejoined room:', roomCode);
   });
 
   // Chat System
@@ -802,167 +836,195 @@ io.on('connection', (socket) => {
     const { message, sender } = data;
     console.log('Chat message received:', { message, sender, socketId: socket.id });
     
-    // Find room and broadcast
-    for (const [roomCode, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id)) {
-        console.log('Broadcasting chat to room:', roomCode);
-        io.to(roomCode).emit('chatMessage', { message, sender, senderId: socket.id });
-        break;
-      }
+    if (socket.roomCode) {
+      io.to(socket.roomCode).emit('chatMessage', {
+        sender: data.sender,
+        message: data.message,
+        senderId: socket.id
+      });
     }
-    
-    // If not found in any room, log error
-    console.log('Socket not found in any room for chat message');
   });
 
   // Voice Chat Signaling
   socket.on('voiceSignal', (data) => {
     const { signal, receiverId } = data;
-    // Relay signal to specific peer
-    io.to(receiverId).emit('voiceSignal', { signal, senderId: socket.id });
+    // Direct target routing to the destination peer ID
+    io.to(receiverId).emit('voiceSignal', {
+      signal: data.signal,
+      senderId: socket.id
+    });
   });
 
   socket.on('voiceEnabled', (userId) => {
-    // Notify room that user enabled voice
-    for (const [roomCode, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id)) {
-        socket.to(roomCode).emit('voiceEnabled', userId);
-        break;
-      }
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('voiceEnabled', userId);
     }
   });
 
   socket.on('voiceDisabled', (userId) => {
-    // Notify room that user disabled voice
-    for (const [roomCode, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id)) {
-        socket.to(roomCode).emit('voiceDisabled', userId);
-        break;
-      }
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('voiceDisabled', userId);
     }
   });
 
   socket.on('getVoicePeers', () => {
-    // Return list of players in room with voice enabled
-    for (const [roomCode, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id)) {
-        const voicePeers = room.players
-          .filter(p => p.id !== socket.id)
-          .map(p => p.id);
-        socket.emit('voicePeers', voicePeers);
-        break;
-      }
-    }
+    const roomCode = socket.roomCode;
+    if (!roomCode || !games[roomCode]) return;
+    
+    // Return all room peer IDs except the current socket
+    const peerIds = Object.keys(games[roomCode].players).filter(id => id !== socket.id);
+    socket.emit('voicePeers', peerIds);
   });
 
   socket.on('playerAction', (data) => {
     const { type, data: actionData } = data;
+    const roomCode = socket.roomCode;
     
-    // Find room and update game state
-    for (const [roomCode, room] of rooms.entries()) {
-      if (room.players.some(p => p.id === socket.id) && room.gameState) {
-        const player = room.gameState.players[socket.id];
+    if (!roomCode || !games[roomCode]) return;
+    
+    const player = games[roomCode].players[socket.id];
+    
+    if (!player || !player.alive) return;
+    
+    switch (type) {
+      case 'move':
+        const { dx, dy } = actionData;
+        const SPEED = 8;
+        player.x += dx * SPEED;
+        player.y += dy * SPEED;
         
-        if (!player || !player.alive) return;
-        
-        switch (type) {
-          case 'move':
-            const { dx, dy } = actionData;
-            const speed = 5;
-            player.x = Math.max(20, Math.min(1480, player.x + dx * speed));
-            player.y = Math.max(20, Math.min(1480, player.y + dy * speed));
-            break;
-            
-          case 'attack':
-            // Check if near wolf
-            const wolf = room.gameState.wolf;
-            if (wolf && wolf.hp > 0) {
-              const dist = Math.sqrt(
-                Math.pow(player.x - wolf.x, 2) +
-                Math.pow(player.y - wolf.y, 2)
-              );
-              if (dist < 100) {
-                wolf.hp -= player.dmg;
-                if (wolf.hp <= 0) {
-                  room.gameState.status = 'over';
-                  room.gameState.endReason = 'Wolf defeated!';
-                }
-              }
-            }
-            break;
-            
-          case 'loot':
-            // Check if near chest
-            room.gameState.chests.forEach(chest => {
-              if (chest.opened) return;
-              const dist = Math.sqrt(
-                Math.pow(player.x - chest.x, 2) +
-                Math.pow(player.y - chest.y, 2)
-              );
-              if (dist < 50) {
-                chest.opened = true;
-                if (chest.reward.type === 'hp') {
-                  player.hp = Math.min(100, player.hp + chest.reward.val);
-                } else if (chest.reward.type === 'dmg') {
-                  player.dmg += chest.reward.val;
-                }
-                player.inventory.push(chest.reward);
-              }
-            });
-            break;
-            
-          case 'useItem':
-            const { index } = actionData;
-            if (player.inventory[index]) {
-              const item = player.inventory[index];
-              player.inventory.splice(index, 1);
-              // Apply item effect
-              if (item.type === 'hp') {
-                player.hp = Math.min(100, player.hp + item.val);
-              } else if (item.type === 'dmg') {
-                player.dmg += item.val;
-              }
-            }
-            break;
-        }
-        
-        // Broadcast updated game state
-        io.to(roomCode).emit('gameStateUpdate', room.gameState);
+        // Map boundaries
+        player.x = Math.max(0, Math.min(player.x, 1500));
+        player.y = Math.max(0, Math.min(player.y, 1500));
         break;
-      }
+        
+      case 'attack':
+        const wolf = games[roomCode].wolf;
+        if (wolf && wolf.hp > 0) {
+          const dist = Math.sqrt(
+            Math.pow(player.x - wolf.x, 2) +
+            Math.pow(player.y - wolf.y, 2)
+          );
+          if (dist < 100) {
+            wolf.hp -= player.dmg;
+            if (wolf.hp <= 0) {
+              games[roomCode].status = 'over';
+              games[roomCode].endReason = 'Wolf defeated!';
+            }
+          }
+        }
+        break;
+        
+      case 'loot':
+        games[roomCode].chests.forEach(chest => {
+          if (chest.opened) return;
+          const dist = Math.sqrt(
+            Math.pow(player.x - chest.x, 2) +
+            Math.pow(player.y - chest.y, 2)
+          );
+          if (dist < 50) {
+            chest.opened = true;
+            if (chest.reward.type === 'hp') {
+              player.hp = Math.min(100, player.hp + chest.reward.val);
+            } else if (chest.reward.type === 'dmg') {
+              player.dmg += chest.reward.val;
+            }
+            player.inventory.push(chest.reward);
+          }
+        });
+        break;
+        
+      case 'useItem':
+        const { index } = actionData;
+        if (player.inventory[index]) {
+          const item = player.inventory[index];
+          player.inventory.splice(index, 1);
+          if (item.type === 'hp') {
+            player.hp = Math.min(100, player.hp + item.val);
+          } else if (item.type === 'dmg') {
+            player.dmg += item.val;
+          }
+        }
+        break;
     }
   });
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
     
-    // Handle player leaving
+    const roomCode = socket.roomCode;
+    if (roomCode && games[roomCode]) {
+      delete games[roomCode].players[socket.id];
+      socket.to(roomCode).emit('userLeft', socket.id);
+      socket.to(roomCode).emit('voiceDisabled', socket.id);
+      io.to(roomCode).emit('systemMessage', `${socket.username || 'A player'} disconnected.`);
+      
+      // Clean up empty rooms
+      if (Object.keys(games[roomCode].players).length === 0) {
+        delete games[roomCode];
+      }
+    }
+    
+    // Also cleanup from rooms Map for lobby compatibility
     for (const [roomCode, room] of rooms.entries()) {
       if (room.host === socket.id) {
-        // Host left - notify all players
         io.to(roomCode).emit('hostLeft', 'Host has left the game');
-        io.to(roomCode).emit('userLeft', socket.id); // Notify for voice chat
-        // TEMPORARILY DISABLED FOR DEBUGGING: rooms.delete(roomCode);
-        console.log('Room deletion disabled for debugging. Room code:', roomCode);
-        // Stop game loop
+        io.to(roomCode).emit('userLeft', socket.id);
         if (gameLoops.has(roomCode)) {
           clearInterval(gameLoops.get(roomCode));
           gameLoops.delete(roomCode);
         }
         break;
       } else if (room.players.some(p => p.id === socket.id)) {
-        // Player left
         room.players = room.players.filter(p => p.id !== socket.id);
-        if (room.gameState && room.gameState.players[socket.id]) {
-          delete room.gameState.players[socket.id];
-        }
         io.to(roomCode).emit('lobbyUpdate', room.players.map(p => p.name));
-        io.to(roomCode).emit('userLeft', socket.id); // Notify for voice chat
+        io.to(roomCode).emit('userLeft', socket.id);
         break;
       }
     }
   });
 });
+
+// Global game loop ticking state data back down to clients at 20fps
+setInterval(() => {
+  for (const roomCode in games) {
+    // Update timer
+    if (games[roomCode].timer > 0) {
+      games[roomCode].timer -= 1;
+    }
+    
+    // Simple wolf AI - move towards nearest player
+    if (games[roomCode].wolf && games[roomCode].wolf.hp > 0) {
+      let nearestPlayer = null;
+      let nearestDist = Infinity;
+      
+      Object.values(games[roomCode].players).forEach(player => {
+        if (!player.alive) return;
+        const dist = Math.sqrt(
+          Math.pow(player.x - games[roomCode].wolf.x, 2) +
+          Math.pow(player.y - games[roomCode].wolf.y, 2)
+        );
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestPlayer = player;
+        }
+      });
+      
+      if (nearestPlayer) {
+        const dx = nearestPlayer.x - games[roomCode].wolf.x;
+        const dy = nearestPlayer.y - games[roomCode].wolf.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 0) {
+          games[roomCode].wolf.x += (dx / dist) * 2;
+          games[roomCode].wolf.y += (dy / dist) * 2;
+        }
+      }
+    }
+    
+    io.to(roomCode).emit('gameStateUpdate', games[roomCode]);
+  }
+}, 50);
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
