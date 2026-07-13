@@ -1,9 +1,9 @@
-// Replace with your exact ngrok URL from your terminal
-const NGROK_URL = "https://nongrievous-janeen-ineffectual.ngrok-free.dev";
+// Use current domain for socket connection
+const SERVER_URL = window.location.origin;
 
-const socket = io(NGROK_URL, {
-  transports: ["websocket"], // CRITICAL: This bypasses the ngrok warning page
-  upgrade: false             // Prevents it from trying HTTP polling first
+const socket = io(SERVER_URL, {
+  transports: ["websocket", "polling"], // Support both for better compatibility
+  upgrade: true
 });
 let isHost = false;
 let myId = null;
