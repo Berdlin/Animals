@@ -1035,51 +1035,68 @@
 
         // Local render loop for client-side prediction
         function localRenderLoop() {
-            if (!gameActive) {
-                requestAnimationFrame(localRenderLoop);
-                return;
+            // Only run if our local coordinates are initialized and the element is ready
+            if (myId && document.getElementById(myId)) {
+                if (!gameActive) {
+                    requestAnimationFrame(localRenderLoop);
+                    return;
+                }
+
+                let dx = 0, dy = 0;
+                if (keyStates['w']) dy--; if (keyStates['s']) dy++;
+                if (keyStates['a']) dx--; if (keyStates['d']) dx++;
+                if (joyActive) { dx = joyData.x; dy = joyData.y; }
+
+                if (dx || dy) {
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    const speedMod = joyActive ? len : 1;
+                    localX += (dx / len) * PLAYER_SPEED * speedMod * 0.05;
+                    localY += (dy / len) * PLAYER_SPEED * speedMod * 0.05;
+                }
+
+                // Map boundaries
+                localX = Math.max(0, Math.min(localX, 1500));
+                localY = Math.max(0, Math.min(localY, 1500));
+
+                // Update local player position instantly
+                const myPlayerEl = getEl('player-' + myId);
+                if (myPlayerEl) {
+                    myPlayerEl.style.left = localX + 'px';
+                    myPlayerEl.style.top = localY + 'px';
+                }
+
+                // Instantly update camera position without waiting for the server
+                updateCamera();
             }
-
-            let dx = 0, dy = 0;
-            if (keyStates['w']) dy--; if (keyStates['s']) dy++;
-            if (keyStates['a']) dx--; if (keyStates['d']) dx++;
-            if (joyActive) { dx = joyData.x; dy = joyData.y; }
-
-            if (dx || dy) {
-                const len = Math.sqrt(dx * dx + dy * dy);
-                const speedMod = joyActive ? len : 1;
-                localX += (dx / len) * PLAYER_SPEED * speedMod * 0.05;
-                localY += (dy / len) * PLAYER_SPEED * speedMod * 0.05;
-            }
-
-            // Map boundaries
-            localX = Math.max(0, Math.min(localX, 1500));
-            localY = Math.max(0, Math.min(localY, 1500));
-
-            // Update local player position instantly
-            const myPlayerEl = getEl('player-' + myId);
-            if (myPlayerEl) {
-                myPlayerEl.style.left = localX + 'px';
-                myPlayerEl.style.top = localY + 'px';
-            }
-
-            // Update camera to keep player centered
-            updateCamera();
-
+            
             requestAnimationFrame(localRenderLoop);
         }
 
         function updateCamera() {
-            const stage = getEl('stage');
-            const viewport = getEl('mapViewport');
-            const centerX = stage.clientWidth / 2;
-            const centerY = stage.clientHeight / 2;
-            camera.x = centerX - localX;
-            camera.y = centerY - localY;
-            camera.x = Math.min(0, Math.max(camera.x, stage.clientWidth - MAP_SIZE));
-            camera.y = Math.min(0, Math.max(camera.y, stage.clientHeight - MAP_SIZE));
+            const stage = document.querySelector('.game-stage');
+            const viewport = document.getElementById('mapViewport');
+            
+            // 1. Safety check: Ensure the stage and viewport actually exist on the page
+            if (!stage || !viewport) return;
 
-            viewport.style.transform = `translate3d(${camera.x}px, ${camera.y}px, 0)`;
+            // 2. Safety check: Ensure your socket ID is active and your player exists
+            if (!myId) return;
+            const myPlayerEl = document.getElementById(myId);
+            if (!myPlayerEl) return; // If player element isn't rendered yet, wait!
+
+            // Parse coordinates safely
+            const playerX = localX; // Use your local predicted X
+            const playerY = localY; // Use your local predicted Y
+
+            // Calculate center camera coordinates
+            const stageW = stage.clientWidth;
+            const stageH = stage.clientHeight;
+
+            const targetX = stageW / 2 - playerX;
+            const targetY = stageH / 2 - playerY;
+
+            // Apply the translation to move the map around the player
+            viewport.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
         }
 
         function showAlert(text, color) {
