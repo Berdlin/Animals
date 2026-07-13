@@ -84,7 +84,7 @@ async function withRetry(operation, maxRetries = 3) {
 
 // Neon database connection with connection pooling
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_3F2dozATYlEZ@ep-solitary-leaf-at9wmy7w-pooler.c-9.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=verify-full',
+  connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: true
   },
